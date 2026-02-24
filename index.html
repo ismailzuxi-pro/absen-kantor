@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi & Registrasi QR</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 500px; background: white; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        /* Tab Styling */
+        .tabs { display: flex; background: #ecf0f1; }
+        .tab-btn { flex: 1; padding: 15px; border: none; cursor: pointer; font-weight: bold; color: #7f8c8d; transition: 0.3s; }
+        .tab-btn.active { background: white; color: #2980b9; border-bottom: 3px solid #3498db; }
+
+        .content { padding: 20px; display: none; }
+        .content.active { display: block; }
+
+        /* Style UI */
+        #reader { border-radius: 10px; overflow: hidden; background: #000; }
+        .status-lokasi { padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; font-size: 0.8em; }
+        .aman { background: #d4edda; color: #155724; }
+        .bahaya { background: #f8d7da; color: #721c24; }
+        
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2ecc71; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        
+        #qrcode-canvas { display: flex; justify-content: center; margin-top: 20px; padding: 10px; background: #eee; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.8em; }
+        th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab('tab-absen')">Absensi</button>
+        <button class="tab-btn" onclick="openTab('tab-admin')">Daftar Pegawai</button>
+    </div>
+
+    <div id="tab-absen" class="content active">
+        <div id="statusLokasi" class="status-lokasi bahaya">Mengecek GPS...</div>
+        <div id="reader"></div>
+        <div id="infoScan" style="text-align: center; margin-top: 10px;"><b>Scan QR Anda</b></div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button id="btnIn" class="btn-success" onclick="prosesAbsen('Masuk')" disabled>Check In</button>
+            <button id="btnOut" class="btn-danger" onclick="prosesAbsen('Pulang')" disabled>Check Out</button>
+        </div>
+
+        <table>
+            <thead><tr><th>Nama</th><th>Tipe</th><th>Jam</th></tr></thead>
+            <tbody id="logAbsen"></tbody>
+        </table>
+    </div>
+
+    <div id="tab-admin" class="content">
+        <h3>Pendaftaran Pegawai</h3>
+        <p style="font-size: 0.8em; color: #666;">Masukkan nama untuk membuat QR Code unik pegawai.</p>
+        <input type="text" id="regNama" placeholder="Nama Lengkap Pegawai...">
+        <button class="btn-primary" onclick="buatQRCode()">Generate QR Code</button>
+        
+        <div id="qrcode-canvas"></div>
+        <p id="qrDesc" style="text-align:center; font-size: 0.8em; display:none;">Klik kanan pada gambar QR untuk simpan/cetak.</p>
+    </div>
+</div>
+
+<script>
+    // --- SETTING GPS (Ganti dengan koordinatmu) ---
+    const LAT_KANTOR = -7.716884146853014; // Ganti dengan Lat kantor Anda
+    const LON_KANTOR = 112.0677810812019; // Ganti dengan Lon kantor Anda
+
+    const JARAK_MAKS = 100;
+
+    let lokasiValid = false;
+    let namaPegawai = "";
+
+    // Fungsi Ganti Tab
+    function openTab(id) {
+        document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    // --- LOGIKA REGISTRASI (BUAT QR) ---
+    function buatQRCode() {
+        const nama = document.getElementById('regNama').value;
+        if(!nama) return alert("Masukkan nama!");
+
+        const container = document.getElementById('qrcode-canvas');
+        container.innerHTML = ""; // Bersihkan QR sebelumnya
+        
+        new QRCode(container, {
+            text: nama,
+            width: 200,
+            height: 200
+        });
+        document.getElementById('qrDesc').style.display = "block";
+    }
+
+    // --- LOGIKA SCANNER ---
+    function onScanSuccess(text) {
+        namaPegawai = text;
+        document.getElementById('infoScan').innerHTML = "Terdeteksi: <b>" + text + "</b>";
+        if(lokasiValid) {
+            document.getElementById('btnIn').disabled = false;
+            document.getElementById('btnOut').disabled = false;
+        }
+    }
+
+    let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+    scanner.render(onScanSuccess);
+
+    // --- LOGIKA GPS ---
+    function startGPS() {
+        navigator.geolocation.watchPosition(pos => {
+            const d = hitungJarak(pos.coords.latitude, pos.coords.longitude, LAT_KANTOR, LON_KANTOR);
+            const el = document.getElementById('statusLokasi');
+            if(d <= JARAK_MAKS) {
+                lokasiValid = true;
+                el.innerText = `Lokasi OK (${Math.round(d)}m)`;
+                el.className = "status-lokasi aman";
+            } else {
+                lokasiValid = false;
+                el.innerText = `Diluar Area (${Math.round(d)}m)`;
+                el.className = "status-lokasi bahaya";
+                document.getElementById('btnIn').disabled = true;
+                document.getElementById('btnOut').disabled = true;
+            }
+        }, null, { enableHighAccuracy: true });
+    }
+
+    function hitungJarak(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = (lat2-lat1)*Math.PI/180;
+        const dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    // --- SIMPAN DATA ---
+    function prosesAbsen(tipe) {
+        const waktu = new Date();
+        const data = { 
+            nama: namaPegawai, 
+            tipe, 
+            jam: waktu.getHours() + ":" + waktu.getMinutes().toString().padStart(2, '0') 
+        };
+        let list = JSON.parse(localStorage.getItem('absensi_final')) || [];
+        list.push(data);
+        localStorage.setItem('absensi_final', JSON.stringify(list));
+        alert("Absen Berhasil!");
+        tampilkanData();
+    }
+
+    function tampilkanData() {
+        const list = JSON.parse(localStorage.getItem('absensi_final')) || [];
+        document.getElementById('logAbsen').innerHTML = list.map(i => `
+            <tr><td>${i.nama}</td><td>${i.tipe}</td><td>${i.jam}</td></tr>
+        `).reverse().join('');
+    }
+
+    startGPS();
+    tampilkanData();
+</script>
+</body>
+</html>
