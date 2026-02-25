@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Online Cloud - CRUD</title>
+    <title>Absensi Cloud Pro</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 15px; display: flex; justify-content: center; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 600px; background: white; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
         .tabs { display: flex; background: #ecf0f1; }
-        .tab-btn { flex: 1; padding: 15px; border: none; cursor: pointer; font-weight: bold; color: #7f8c8d; }
+        .tab-btn { flex: 1; padding: 15px; border: none; cursor: pointer; font-weight: bold; color: #7f8c8d; transition: 0.3s; }
         .tab-btn.active { background: white; color: #2980b9; border-bottom: 3px solid #3498db; }
         .content { padding: 20px; display: none; }
         .content.active { display: block; }
@@ -22,13 +22,14 @@
         .bahaya { background: #f8d7da; color: #721c24; }
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
         button { padding: 10px 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; margin: 2px; }
-        .btn-blue { background: #3498db; width: 100%; }
+        .btn-blue { background: #3498db; width: 100%; margin-bottom: 10px; }
         .btn-green { background: #2ecc71; }
         .btn-red { background: #e74c3c; }
         .btn-orange { background: #f39c12; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.85em; }
         th, td { border-bottom: 1px solid #eee; padding: 12px 8px; text-align: left; }
         .qr-area { text-align: center; margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 10px; border: 1px dashed #ccc; }
+        .btn-small { padding: 5px 8px; font-size: 0.8em; }
     </style>
 </head>
 <body>
@@ -36,37 +37,38 @@
 <div class="container">
     <div class="tabs">
         <button class="tab-btn active" onclick="openTab('tab-absen')">Absensi</button>
-        <button class="tab-btn" onclick="openTab('tab-admin')">Manajemen Pegawai</button>
+        <button class="tab-btn" onclick="openTab('tab-admin')">Daftar Pegawai</button>
     </div>
 
     <div id="tab-absen" class="content active">
         <div id="statusLokasi" class="status-lokasi bahaya">Mengecek GPS...</div>
         <div id="reader"></div>
-        <div id="infoScan" style="text-align: center; margin-bottom: 10px;"><b>Silakan Scan QR Pegawai</b></div>
+        <div id="infoScan" style="text-align: center; margin-bottom: 15px;"><b>Scan QR Code Pegawai</b></div>
         <div style="display: flex; gap: 10px;">
             <button id="btnIn" class="btn-green" style="flex:1" onclick="prosesAbsen('Masuk')" disabled>Check In</button>
             <button id="btnOut" class="btn-red" style="flex:1" onclick="prosesAbsen('Pulang')" disabled>Check Out</button>
         </div>
-        <h4 style="margin-top: 20px;">Riwayat Hari Ini (Cloud)</h4>
+        <h4 style="margin-top: 25px; border-bottom: 2px solid #eee;">Riwayat Hari Ini (Cloud)</h4>
         <table>
-            <thead><tr><th>Nama</th><th>Tipe</th><th>Waktu</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Tipe</th><th>Jam</th></tr></thead>
             <tbody id="logAbsen"></tbody>
         </table>
     </div>
 
     <div id="tab-admin" class="content">
-        <h3 id="formTitle">Daftar Pegawai Baru</h3>
-        <input type="hidden" id="oldName">
+        <h3 id="formTitle">Pendaftaran Pegawai</h3>
+        <input type="hidden" id="editKey">
         <input type="text" id="regNama" placeholder="Nama Lengkap Pegawai...">
         <button id="btnSimpan" class="btn-blue" onclick="simpanPegawai()">Simpan Ke Cloud</button>
+        <button id="btnBatal" class="btn-red" style="display:none; width:100%" onclick="resetForm()">Batal Edit</button>
         
         <div id="qrPrint" class="qr-area" style="display: none;">
             <div id="qrcode" style="display: flex; justify-content: center;"></div>
             <p id="qrLabel" style="font-weight: bold; margin-top: 10px;"></p>
-            <p style="font-size: 0.7em; color: #666;">Simpan QR ini untuk Pegawai</p>
+            <p style="font-size: 0.7em; color: #666;">Klik kanan/Tahan pada QR untuk simpan</p>
         </div>
 
-        <h4 style="margin-top: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px;">Data Induk Pegawai</h4>
+        <h4 style="margin-top: 30px; border-bottom: 2px solid #eee;">Daftar Pegawai Terdaftar</h4>
         <table>
             <thead><tr><th>Nama Pegawai</th><th>Aksi</th></tr></thead>
             <tbody id="listPegawai"></tbody>
@@ -75,7 +77,7 @@
 </div>
 
 <script>
-    // ======= KONFIGURASI FIREBASE (WAJIB ISI) =======
+    // ======= 1. PASTE FIREBASE CONFIG KAMU DI SINI =======
     const firebaseConfig = {
   apiKey: "AIzaSyCMu-Bfd1GQWIoT1CnInPtWcIDCJkhSIgQ",
   authDomain: "absensi-kantor-cf8b7.firebaseapp.com",
@@ -86,7 +88,7 @@
 };
 
 
-    // ======= SETTING KANTOR =======
+    // ======= 2. SETTING KANTOR =======
     const LAT_KANTOR = -7.716884146853014; // Ganti dengan Lat kantor Anda
     const LON_KANTOR = 112.0677810812019; // Ganti dengan Lon kantor Anda
     const RAD_MAKS = 100;
@@ -103,43 +105,50 @@
         event.currentTarget.classList.add('active');
     }
 
-    // --- FITUR CRUD PEGAWAI (CLOUD) ---
+    // --- MANAJEMEN PEGAWAI CLOUD (CRUD) ---
     function simpanPegawai() {
         const nama = document.getElementById('regNama').value.trim();
-        const oldName = document.getElementById('oldName').value;
+        const editKey = document.getElementById('editKey').value;
 
-        if(!nama) return alert("Nama harus diisi");
+        if(!nama) return alert("Masukkan nama!");
 
-        if(oldName) {
-            // Jika mode Edit: Hapus yang lama, ganti yang baru
-            db.ref('pegawai/' + oldName).remove();
+        if(editKey) {
+            // Mode Update
+            db.ref('pegawai/' + editKey).update({ nama: nama }).then(() => {
+                alert("Data berhasil diupdate!");
+                resetForm();
+            });
+        } else {
+            // Mode Tambah Baru
+            const newKey = db.ref('pegawai').push().key;
+            db.ref('pegawai/' + newKey).set({ nama: nama }).then(() => {
+                alert("Pegawai terdaftar di Cloud!");
+                showQR(nama);
+                document.getElementById('regNama').value = "";
+            });
         }
+    }
 
-        db.ref('pegawai/' + nama).set({ nama: nama }).then(() => {
-            alert("Data Berhasil Diperbarui!");
-            showQR(nama);
-            resetForm();
-        });
+    function editPegawai(key, nama) {
+        document.getElementById('regNama').value = nama;
+        document.getElementById('editKey').value = key;
+        document.getElementById('formTitle').innerText = "Edit Pegawai";
+        document.getElementById('btnSimpan').innerText = "Update Nama";
+        document.getElementById('btnBatal').style.display = "block";
+        document.getElementById('qrPrint').style.display = "none";
     }
 
     function resetForm() {
         document.getElementById('regNama').value = "";
-        document.getElementById('oldName').value = "";
-        document.getElementById('formTitle').innerText = "Daftar Pegawai Baru";
+        document.getElementById('editKey').value = "";
+        document.getElementById('formTitle').innerText = "Pendaftaran Pegawai";
         document.getElementById('btnSimpan').innerText = "Simpan Ke Cloud";
+        document.getElementById('btnBatal').style.display = "none";
     }
 
-    function editPegawai(nama) {
-        document.getElementById('regNama').value = nama;
-        document.getElementById('oldName').value = nama;
-        document.getElementById('formTitle').innerText = "Edit Pegawai";
-        document.getElementById('btnSimpan').innerText = "Update & Simpan";
-        document.getElementById('qrPrint').style.display = "none";
-    }
-
-    function hapusPegawai(nama) {
-        if(confirm("Hapus data " + nama + " dari database cloud?")) {
-            db.ref('pegawai/' + nama).remove();
+    function hapusPegawai(key) {
+        if(confirm("Hapus pegawai ini dari cloud?")) {
+            db.ref('pegawai/' + key).remove();
         }
     }
 
@@ -150,28 +159,28 @@
         document.getElementById('qrPrint').style.display = "block";
     }
 
-    // Sinkronisasi List Pegawai secara Realtime
+    // Monitor Daftar Pegawai Realtime
     db.ref('pegawai').on('value', (snap) => {
         const data = snap.val();
         let html = "";
         for(let key in data) {
-            let nama = data[key].nama;
+            let n = data[key].nama;
             html += `<tr>
-                <td><strong>${nama}</strong></td>
+                <td><strong>${n}</strong></td>
                 <td>
-                    <button class="btn-orange" onclick="editPegawai('${nama}')">Edit</button>
-                    <button class="btn-red" onclick="hapusPegawai('${nama}')">Hapus</button>
-                    <button class="btn-green" onclick="showQR('${nama}')">QR</button>
+                    <button class="btn-orange btn-small" onclick="editPegawai('${key}', '${n}')">Edit</button>
+                    <button class="btn-red btn-small" onclick="hapusPegawai('${key}')">Hapus</button>
+                    <button class="btn-green btn-small" onclick="showQR('${n}')">QR</button>
                 </td>
             </tr>`;
         }
-        document.getElementById('listPegawai').innerHTML = html || "<tr><td colspan='2'>Belum ada pegawai</td></tr>";
+        document.getElementById('listPegawai').innerHTML = html || "<tr><td colspan='2'>Belum ada data</td></tr>";
     });
 
-    // --- FITUR ABSENSI ---
+    // --- SISTEM ABSENSI ---
     function onScanSuccess(text) {
-        // Cek apakah QR terdaftar di database
-        db.ref('pegawai/' + text).once('value', (snap) => {
+        // Cek apakah QR ada di database pegawai
+        db.ref('pegawai').orderByChild('nama').equalTo(text).once('value', (snap) => {
             if(snap.exists()) {
                 namaTerdeteksi = text;
                 document.getElementById('infoScan').innerHTML = "Terdeteksi: <b style='color:green'>" + text + "</b>";
@@ -195,17 +204,17 @@
             nama: namaTerdeteksi, 
             tipe: tipe, 
             waktu: jam,
-            timestamp: firebase.database.ServerValue.TIMESTAMP 
+            ts: firebase.database.ServerValue.TIMESTAMP 
         });
         alert("Absen " + tipe + " Berhasil!");
     }
 
-    db.ref('log_absen').orderByChild('timestamp').limitToLast(10).on('value', (snap) => {
+    db.ref('log_absen').orderByChild('ts').limitToLast(10).on('value', (snap) => {
         const data = snap.val();
         let html = "";
         if(data) {
-            Object.values(data).reverse().forEach(item => {
-                html += `<tr><td>${item.nama}</td><td>${item.tipe}</td><td>${item.waktu}</td></tr>`;
+            Object.values(data).reverse().forEach(i => {
+                html += `<tr><td>${i.nama}</td><td>${i.tipe}</td><td>${i.waktu}</td></tr>`;
             });
         }
         document.getElementById('logAbsen').innerHTML = html;
