@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Final Version</title>
+    <title>Absensi Pro - Jam Kerja & Terlambat</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -30,6 +30,9 @@
         button:disabled { background: #bdc3c7; cursor: not-allowed; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em; }
         th, td { border-bottom: 1px solid #eee; padding: 12px 8px; text-align: left; }
+        .badge { padding: 3px 8px; border-radius: 5px; font-size: 0.8em; color: white; }
+        .bg-red { background: #e74c3c; }
+        .bg-green { background: #27ae60; }
         .qr-area { text-align: center; margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 10px; border: 1px dashed #ccc; }
     </style>
 </head>
@@ -51,11 +54,11 @@
         </div>
         
         <div style="margin-top: 25px; display: flex; justify-content: space-between; align-items: center;">
-            <h4 style="margin: 0;">Riwayat Hari Ini</h4>
-            <button onclick="exportLogAbsen()" style="background:#27ae60; font-size:0.7em; padding:5px 10px;">💾 Export Excel</button>
+            <h4 style="margin: 0;">Log Hari Ini</h4>
+            <button onclick="exportLogAbsen()" style="background:#27ae60; font-size:0.75em; padding:5px 10px;">💾 Download Excel</button>
         </div>
         <table>
-            <thead><tr><th>Nama</th><th>Tipe</th><th>Jam</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Tipe</th><th>Jam</th><th>Ket</th></tr></thead>
             <tbody id="logAbsen"></tbody>
         </table>
     </div>
@@ -74,7 +77,7 @@
 
         <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px;">
             <h4 style="margin: 0;">Daftar Pegawai</h4>
-            <button onclick="exportDaftarPegawai()" style="background:#27ae60; font-size:0.7em; padding:5px 10px;">💾 Export Excel</button>
+            <button onclick="exportDaftarPegawai()" style="background:#27ae60; font-size:0.75em; padding:5px 10px;">💾 Export List</button>
         </div>
         <table>
             <thead><tr><th>Nama Pegawai</th><th>Aksi</th></tr></thead>
@@ -84,7 +87,6 @@
 </div>
 
 <script>
-    // ======= 1. FIREBASE CONFIG (DATA DARI IMAGE) =======
     const firebaseConfig = {
         apiKey: "AIzaSyCMu-Bfd1GQWIoT1CnInPtWcIDCJkhSIgQ",
         authDomain: "absensi-kantor-cf8b7.firebaseapp.com",
@@ -95,15 +97,16 @@
         appId: "1:287648038826:web:15c9e546d66162980f75d3"
     };
 
-    // ======= 2. SETTING KANTOR (DATA DARI IMAGE) =======
     const LAT_KANTOR = -7.716884146853014; 
     const LON_KANTOR = 112.0677810812019; 
     const RAD_MAKS = 100;
+    const JAM_MASUK_MAKS = "08:00"; // Setting jam masuk
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     let lokasiOk = false;
     let namaTerdeteksi = "";
+    let dataMasukHariIni = null; // Untuk hitung jam kerja
 
     function openTab(id) {
         document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
@@ -112,42 +115,38 @@
         event.currentTarget.classList.add('active');
     }
 
-    // CEK PEMBATASAN HARIAN
     function checkDailyLimit(nama) {
         const tglHariIni = new Date().toLocaleDateString('id-ID');
         db.ref('log_absen').once('value', (snap) => {
             let sudahMasuk = false;
             let sudahPulang = false;
+            dataMasukHariIni = null;
             
             snap.forEach((child) => {
                 const log = child.val();
                 const tglLog = new Date(log.ts).toLocaleDateString('id-ID');
                 if(log.nama === nama && tglLog === tglHariIni) {
-                    if(log.tipe === 'Masuk') sudahMasuk = true;
+                    if(log.tipe === 'Masuk') { sudahMasuk = true; dataMasukHariIni = log; }
                     if(log.tipe === 'Pulang') sudahPulang = true;
                 }
             });
 
-            document.getElementById('infoScan').innerHTML = `Terdeteksi: <b>${nama}</b>`;
+            document.getElementById('infoScan').innerHTML = `Pegawai: <b>${nama}</b>`;
             const bIn = document.getElementById('btnIn');
             const bOut = document.getElementById('btnOut');
 
-            if(sudahMasuk) { bIn.disabled = true; bIn.innerText = "Sudah Masuk"; } 
-            else { bIn.disabled = !lokasiOk; bIn.innerText = "Check In"; }
+            bIn.disabled = (sudahMasuk || !lokasiOk);
+            bIn.innerText = sudahMasuk ? "Sudah Masuk" : "Check In";
 
-            if(sudahPulang) { bOut.disabled = true; bOut.innerText = "Sudah Pulang"; } 
-            else { bOut.disabled = !lokasiOk; bOut.innerText = "Check Out"; }
+            bOut.disabled = (sudahPulang || !lokasiOk || !sudahMasuk);
+            bOut.innerText = sudahPulang ? "Sudah Pulang" : "Check Out";
         });
     }
 
     function onScanSuccess(text) {
         db.ref('pegawai').orderByChild('nama').equalTo(text).once('value', (snap) => {
-            if(snap.exists()) {
-                namaTerdeteksi = text;
-                checkDailyLimit(text);
-            } else {
-                document.getElementById('infoScan').innerHTML = "<b style='color:red'>QR Tidak Terdaftar!</b>";
-            }
+            if(snap.exists()) { namaTerdeteksi = text; checkDailyLimit(text); }
+            else { document.getElementById('infoScan').innerHTML = "<b style='color:red'>QR Tidak Terdaftar!</b>"; }
         });
     }
 
@@ -155,121 +154,115 @@
     scanner.render(onScanSuccess);
 
     function prosesAbsen(tipe) {
-        const jam = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        const sekarang = new Date();
+        const jamStr = sekarang.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+        let keterangan = "-";
+        let jamKerja = "-";
+
+        if(tipe === 'Masuk') {
+            keterangan = (jamStr > JAM_MASUK_MAKS) ? "Terlambat" : "Tepat Waktu";
+        } else if(tipe === 'Pulang' && dataMasukHariIni) {
+            const msk = dataMasukHariIni.ts;
+            const plg = sekarang.getTime();
+            const diffMs = plg - msk;
+            const hrs = Math.floor(diffMs / 3600000);
+            const mins = Math.floor((diffMs % 3600000) / 60000);
+            jamKerja = `${hrs} Jam ${mins} Menit`;
+        }
+
         db.ref('log_absen').push({ 
-            nama: namaTerdeteksi, tipe, waktu: jam, ts: firebase.database.ServerValue.TIMESTAMP 
-        }).then(() => {
-            alert("Absen " + tipe + " Berhasil!");
-            location.reload();
-        });
+            nama: namaTerdeteksi, tipe, waktu: jamStr, ts: firebase.database.ServerValue.TIMESTAMP, 
+            status: keterangan, durasi: jamKerja
+        }).then(() => { alert("Berhasil!"); location.reload(); });
     }
 
-    // EXPORT EXCEL
+    // EXPORT EXCEL PRO
     function exportLogAbsen() {
         db.ref('log_absen').once('value', (snap) => {
             const data = snap.val();
-            if(!data) return alert("Belum ada data!");
+            if(!data) return alert("Kosong!");
             const rows = Object.values(data).map(item => ({
-                Nama: item.nama, Tipe: item.tipe, Jam: item.waktu, Tanggal: new Date(item.ts).toLocaleDateString('id-ID')
+                Tanggal: new Date(item.ts).toLocaleDateString('id-ID'),
+                Nama: item.nama,
+                Tipe: item.tipe,
+                Jam: item.waktu,
+                Keterangan: item.status || "-",
+                Total_Jam_Kerja: item.durasi || "-"
             }));
             const ws = XLSX.utils.json_to_sheet(rows);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Log_Absensi");
-            XLSX.writeFile(wb, `Rekap_Absen_${new Date().toLocaleDateString()}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "Rekap_Absensi");
+            XLSX.writeFile(wb, `Laporan_Absen_${new Date().toLocaleDateString()}.xlsx`);
         });
     }
 
-    function exportDaftarPegawai() {
-        db.ref('pegawai').once('value', (snap) => {
-            const data = snap.val();
-            const rows = Object.values(data).map(item => ({ Nama_Pegawai: item.nama }));
-            const ws = XLSX.utils.json_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Daftar_Pegawai");
-            XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
-        });
-    }
-
-    // CRUD PEGAWAI
-    function simpanPegawai() {
-        const nama = document.getElementById('regNama').value.trim();
-        const editKey = document.getElementById('editKey').value;
-        if(!nama) return alert("Nama harus diisi!");
-
-        if(editKey) {
-            db.ref('pegawai/' + editKey).update({ nama }).then(() => { resetForm(); });
-        } else {
-            const newKey = db.ref('pegawai').push().key;
-            db.ref('pegawai/' + newKey).set({ nama }).then(() => { showQR(nama); document.getElementById('regNama').value = ""; });
-        }
-    }
-
-    function editPegawai(key, nama) {
-        document.getElementById('regNama').value = nama;
-        document.getElementById('editKey').value = key;
-        document.getElementById('formTitle').innerText = "Edit Pegawai";
-        document.getElementById('btnSimpan').innerText = "Update Nama";
-        document.getElementById('btnBatal').style.display = "block";
-    }
-
-    function resetForm() {
-        document.getElementById('regNama').value = "";
-        document.getElementById('editKey').value = "";
-        document.getElementById('formTitle').innerText = "Pendaftaran Pegawai";
-        document.getElementById('btnSimpan').innerText = "Simpan Ke Cloud";
-        document.getElementById('btnBatal').style.display = "none";
-    }
-
-    function hapusPegawai(key) { if(confirm("Hapus pegawai ini?")) db.ref('pegawai/' + key).remove(); }
-
-    function showQR(nama) {
-        document.getElementById('qrcode').innerHTML = "";
-        new QRCode(document.getElementById('qrcode'), { text: nama, width: 150, height: 150 });
-        document.getElementById('qrLabel').innerText = nama;
-        document.getElementById('qrPrint').style.display = "block";
-    }
-
+    // LIST PEGAWAI & LOG (DISPLAY)
     db.ref('pegawai').on('value', (snap) => {
-        const data = snap.val();
         let html = "";
-        for(let key in data) {
-            let n = data[key].nama;
+        snap.forEach(c => {
+            let n = c.val().nama;
             html += `<tr><td><strong>${n}</strong></td><td>
-                <button class="btn-orange" style="padding:5px 8px; font-size:0.8em" onclick="editPegawai('${key}', '${n}')">Edit</button>
-                <button class="btn-red" style="padding:5px 8px; font-size:0.8em" onclick="hapusPegawai('${key}')">Hapus</button>
-                <button class="btn-green" style="padding:5px 8px; font-size:0.8em" onclick="showQR('${n}')">QR</button>
+                <button class="btn-orange" style="padding:5px" onclick="editPegawai('${c.key}', '${n}')">Edit</button>
+                <button class="btn-red" style="padding:5px" onclick="hapusPegawai('${c.key}')">Del</button>
+                <button class="btn-green" style="padding:5px" onclick="showQR('${n}')">QR</button>
             </td></tr>`;
-        }
-        document.getElementById('listPegawai').innerHTML = html || "<tr><td colspan='2'>Kosong</td></tr>";
+        });
+        document.getElementById('listPegawai').innerHTML = html || "<tr><td>Belum ada data</td></tr>";
     });
 
     db.ref('log_absen').orderByChild('ts').limitToLast(10).on('value', (snap) => {
-        const data = snap.val();
         let html = "";
-        if(data) {
-            Object.values(data).reverse().forEach(i => {
-                html += `<tr><td>${i.nama}</td><td>${i.tipe}</td><td>${i.waktu}</td></tr>`;
-            });
-        }
+        const data = [];
+        snap.forEach(c => data.push(c.val()));
+        data.reverse().forEach(i => {
+            const badgeCls = i.status === "Terlambat" ? "bg-red" : (i.status === "Tepat Waktu" ? "bg-green" : "");
+            const ket = i.tipe === "Pulang" ? `<small>${i.durasi}</small>` : `<span class="badge ${badgeCls}">${i.status}</span>`;
+            html += `<tr><td>${i.nama}</td><td>${i.tipe}</td><td>${i.waktu}</td><td>${ket}</td></tr>`;
+        });
         document.getElementById('logAbsen').innerHTML = html;
     });
 
-    // GPS TRACKER
+    // SISTEM ADMIN & GPS
+    function simpanPegawai() {
+        const n = document.getElementById('regNama').value.trim();
+        const k = document.getElementById('editKey').value;
+        if(!n) return;
+        if(k) db.ref('pegawai/' + k).update({ nama: n }).then(() => resetForm());
+        else db.ref('pegawai').push({ nama: n }).then(() => { showQR(n); document.getElementById('regNama').value = ""; });
+    }
+    function editPegawai(k, n) { 
+        document.getElementById('regNama').value = n; document.getElementById('editKey').value = k;
+        document.getElementById('formTitle').innerText = "Edit Pegawai"; document.getElementById('btnBatal').style.display = "block";
+    }
+    function resetForm() { 
+        document.getElementById('regNama').value = ""; document.getElementById('editKey').value = "";
+        document.getElementById('formTitle').innerText = "Pendaftaran"; document.getElementById('btnBatal').style.display = "none";
+    }
+    function hapusPegawai(k) { if(confirm("Hapus?")) db.ref('pegawai/' + k).remove(); }
+    function showQR(n) {
+        document.getElementById('qrcode').innerHTML = "";
+        new QRCode(document.getElementById('qrcode'), { text: n, width: 150, height: 150 });
+        document.getElementById('qrLabel').innerText = n; document.getElementById('qrPrint').style.display = "block";
+    }
+    function exportDaftarPegawai() {
+        db.ref('pegawai').once('value', (s) => {
+            const r = []; s.forEach(c => r.push({ Nama: c.val().nama }));
+            const ws = XLSX.utils.json_to_sheet(r); const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Pegawai"); XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
+        });
+    }
+
     navigator.geolocation.watchPosition(pos => {
         const d = hitungJarak(pos.coords.latitude, pos.coords.longitude, LAT_KANTOR, LON_KANTOR);
         const el = document.getElementById('statusLokasi');
-        if(d <= RAD_MAKS) {
-            lokasiOk = true; el.innerText = `Lokasi OK (${Math.round(d)}m)`; el.className = "status-lokasi aman";
-        } else {
-            lokasiOk = false; el.innerText = `Diluar Area (${Math.round(d)}m)`; el.className = "status-lokasi bahaya";
-            document.getElementById('btnIn').disabled = true; document.getElementById('btnOut').disabled = true;
-        }
+        lokasiOk = d <= RAD_MAKS;
+        el.innerText = `${lokasiOk ? 'Lokasi OK' : 'Diluar Area'} (${Math.round(d)}m)`;
+        el.className = `status-lokasi ${lokasiOk ? 'aman' : 'bahaya'}`;
     }, null, { enableHighAccuracy: true });
 
     function hitungJarak(lat1, lon1, lat2, lon2) {
         const R = 6371000;
-        const dLat = (lat2-lat1)*Math.PI/180;
-        const dLon = (lon2-lon1)*Math.PI/180;
+        const dLat = (lat2-lat1)*Math.PI/180; const dLon = (lon2-lon1)*Math.PI/180;
         const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
