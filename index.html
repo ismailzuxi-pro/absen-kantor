@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Fitur Lengkap & Suara</title>
+    <title>Absensi Pro - Final Fix</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -18,22 +18,15 @@
         .tab-btn.active { background: var(--card); color: #3498db; border-bottom: 3px solid #3498db; }
         .content { padding: 20px; display: none; }
         .content.active { display: block; }
-        
+        #reader { border-radius: 10px; overflow: hidden; background: #000; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
-        th { color: #888; font-size: 0.9em; }
-        
         .btn-action { padding: 6px 12px; border-radius: 6px; border: none; color: white; font-weight: bold; font-size: 0.75em; cursor: pointer; margin-right: 4px; }
-        .btn-edit { background: #f1c40f; }
-        .btn-hapus { background: #e74c3c; }
-        .btn-qr { background: #2ecc71; }
+        .btn-edit { background: #f1c40f; } .btn-hapus { background: #e74c3c; } .btn-qr { background: #2ecc71; }
         .btn-excel { background: #27ae60; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.8em; border: none; cursor: pointer; }
-        
         input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
         .btn-primary { background: #3498db; color: white; width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        
         .badge { padding: 4px 8px; border-radius: 5px; font-size: 0.75em; color: white; font-weight: bold; }
-        #reader { border-radius: 10px; overflow: hidden; background: #000; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -81,7 +74,6 @@
 </div>
 
 <script>
-    // CONFIG FIREBASE (Sesuai Gambar Anda)
     const firebaseConfig = {
         apiKey: "AIzaSyCMu-Bfd1GQWIoT1CnInPtWcIDCJkhSIgQ",
         authDomain: "absensi-kantor-cf8b7.firebaseapp.com",
@@ -96,7 +88,6 @@
     const db = firebase.database();
     let namaTerdeteksi = "";
 
-    // FITUR SUARA
     function bicara(teks) {
         const msg = new SpeechSynthesisUtterance(teks);
         msg.lang = 'id-ID';
@@ -110,38 +101,77 @@
         document.getElementById(id === 'tab-absen' ? 'tabAbsenBtn' : 'tabPegawaiBtn').classList.add('active');
     }
 
-    // LIST LOG DENGAN LOGIKA TERLAMBAT
+    // FIX: RIWAYAT ABSENSI MUNCUL DENGAN BENAR
     db.ref('log_absen').on('value', (snap) => {
         let html = ""; let arr = [];
-        snap.forEach(c => arr.push(c.val()));
-        arr.reverse().slice(0, 10).forEach(i => {
-            let teksKet = i.status || "-";
-            let warna = teksKet === "Terlambat" ? "#e74c3c" : "#2ecc71";
-            if(i.tipe === "Pulang") warna = "#3498db";
-            
-            html += `<tr>
-                <td><strong>${i.nama}</strong></td>
-                <td>${i.tipe}</td>
-                <td>${i.waktu}</td>
-                <td><span class="badge" style="background:${warna}">${teksKet}</span></td>
-            </tr>`;
+        const tglHariIni = new Date().toLocaleDateString('id-ID');
+        snap.forEach(c => {
+            const data = c.val();
+            const tglData = new Date(data.ts).toLocaleDateString('id-ID');
+            if(tglData === tglHariIni) arr.push(data);
         });
-        document.getElementById('logAbsen').innerHTML = html;
+        arr.reverse().forEach(i => {
+            let warna = i.status === "Terlambat" ? "#e74c3c" : "#2ecc71";
+            if(i.tipe === "Pulang") warna = "#3498db";
+            html += `<tr><td><strong>${i.nama}</strong></td><td>${i.tipe}</td><td>${i.waktu}</td><td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td></tr>`;
+        });
+        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4' style='text-align:center'>Belum ada absensi hari ini</td></tr>";
     });
 
-    // LIST PEGAWAI DENGAN TOMBOL EDIT, HAPUS, QR (Sesuai image_b3e45a.png)
+    // FIX: FITUR ABSEN SEKALI SEHARI
+    function checkStatusAbsen(nama) {
+        const tglHariIni = new Date().toLocaleDateString('id-ID');
+        db.ref('log_absen').once('value', (snap) => {
+            let sdhMasuk = false; let sdhPulang = false;
+            snap.forEach(c => {
+                const log = c.val();
+                const tglLog = new Date(log.ts).toLocaleDateString('id-ID');
+                if(log.nama === nama && tglLog === tglHariIni) {
+                    if(log.tipe === "Masuk") sdhMasuk = true;
+                    if(log.tipe === "Pulang") sdhPulang = true;
+                }
+            });
+            document.getElementById('btnIn').disabled = sdhMasuk;
+            document.getElementById('btnOut').disabled = (!sdhMasuk || sdhPulang);
+            
+            if(sdhMasuk && sdhPulang) {
+                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sdh Absen Lengkap)</span>`;
+            }
+        });
+    }
+
+    // FUNGSI PROSES ABSEN
+    function prosesAbsen(tipe) {
+        const skrg = new Date();
+        const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+        let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
+
+        db.ref('log_absen').push({
+            nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, status: status, ts: Date.now()
+        }).then(() => {
+            bicara(`Absen ${tipe} ${namaTerdeteksi} berhasil.`);
+            alert(`Absen ${tipe} Berhasil!`);
+        });
+    }
+
+    // SCANNER
+    let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+    scanner.render((txt) => {
+        namaTerdeteksi = txt;
+        document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${txt}</span>`;
+        checkStatusAbsen(txt);
+    });
+
+    // MENU DAFTAR PEGAWAI (TIDAK BERUBAH)
     db.ref('pegawai').on('value', (snap) => {
         let html = "";
         snap.forEach(c => {
             const data = c.val();
-            html += `<tr>
-                <td>${data.nama}</td>
-                <td>
-                    <button class="btn-action btn-edit" onclick="editPegawai('${c.key}', '${data.nama}')">Edit</button>
-                    <button class="btn-action btn-hapus" onclick="hapusPegawai('${c.key}')">Hapus</button>
-                    <button class="btn-action btn-qr" onclick="tampilQR('${data.nama}')">QR</button>
-                </td>
-            </tr>`;
+            html += `<tr><td>${data.nama}</td><td>
+                <button class="btn-action btn-edit" onclick="editPegawai('${c.key}', '${data.nama}')">Edit</button>
+                <button class="btn-action btn-hapus" onclick="hapusPegawai('${c.key}')">Hapus</button>
+                <button class="btn-action btn-qr" onclick="tampilQR('${data.nama}')">QR</button>
+            </td></tr>`;
         });
         document.getElementById('listPegawai').innerHTML = html;
     });
@@ -153,70 +183,24 @@
             tampilQR(n);
         });
     }
-
-    function editPegawai(key, namaLama) {
-        const baru = prompt("Ubah Nama Pegawai:", namaLama);
-        if(baru) db.ref('pegawai/' + key).update({ nama: baru });
-    }
-
-    function hapusPegawai(key) {
-        if(confirm("Hapus pegawai ini?")) db.ref('pegawai/' + key).remove();
-    }
-
-    function tampilQR(nama) {
+    function editPegawai(k, n) { const b = prompt("Ubah Nama:", n); if(b) db.ref('pegawai/' + k).update({ nama: b }); }
+    function hapusPegawai(k) { if(confirm("Hapus?")) db.ref('pegawai/' + k).remove(); }
+    function tampilQR(n) {
         document.getElementById('qrcode-container').style.display = "block";
         document.getElementById('qrcode').innerHTML = "";
-        new QRCode(document.getElementById('qrcode'), { text: nama, width: 120, height: 120 });
-        document.getElementById('qrLabel').innerText = nama;
+        new QRCode(document.getElementById('qrcode'), { text: n, width: 120, height: 120 });
+        document.getElementById('qrLabel').innerText = n;
     }
-
-    // PROSES ABSEN + LOGIKA TERLAMBAT + SUARA
-    function prosesAbsen(tipe) {
-        const skrg = new Date();
-        const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
-        
-        let status = "-";
-        if(tipe === "Masuk") {
-            // Batas jam 08:00
-            status = (jamStr > "08:00") ? "Terlambat" : "Tepat Waktu";
-        } else {
-            status = "Selesai";
-        }
-
-        db.ref('log_absen').push({
-            nama: namaTerdeteksi, 
-            tipe: tipe, 
-            waktu: jamStr, 
-            status: status,
-            ts: Date.now()
-        }).then(() => {
-            bicara(`Terima kasih ${namaTerdeteksi}, absen ${tipe} berhasil. Status ${status}`);
-            alert(`Absen ${tipe} Berhasil!`);
-            location.reload();
-        });
-    }
-
     function exportExcel() {
         db.ref('log_absen').once('value', (snap) => {
-            let data = [];
-            snap.forEach(c => {
+            let data = []; snap.forEach(c => {
                 const i = c.val();
-                data.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Keterangan: i.status });
+                data.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Ket: i.status });
             });
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Rekap_Absensi");
-            XLSX.writeFile(wb, "Laporan_Absensi_Kantor.xlsx");
+            const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Rekap"); XLSX.writeFile(wb, "Laporan_Absen.xlsx");
         });
     }
-
-    let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-    scanner.render((txt) => {
-        namaTerdeteksi = txt;
-        document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${txt}</span>`;
-        document.getElementById('btnIn').disabled = false;
-        document.getElementById('btnOut').disabled = false;
-    });
 </script>
 </body>
 </html>
