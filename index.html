@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Lock Radius 100m</title>
+    <title>Absensi Pro - Suara Aktif & Radius 100m</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -28,13 +28,12 @@
         .btn-primary { background: #3498db; color: white; width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .badge { padding: 4px 8px; border-radius: 5px; font-size: 0.75em; color: white; font-weight: bold; }
         
-        /* Style tombol absen */
         .btn-absen { flex:1; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; color:white; transition: 0.3s; }
         .btn-absen.masuk { background:#2ecc71; }
         .btn-absen.pulang { background:#e74c3c; }
         
-        /* Keadaan saat tombol terkunci/disabled */
-        .btn-absen:disabled { background:#bdc3c7 !important; cursor:not-allowed; opacity: 0.5; }
+        /* State untuk tombol nonaktif */
+        .btn-absen:disabled { background:#bdc3c7 !important; cursor:not-allowed; opacity: 0.6; }
         
         #jarakStatus { text-align:center; font-size: 0.85em; margin-bottom: 10px; font-weight: bold; padding: 8px; border-radius: 8px; }
     </style>
@@ -51,7 +50,7 @@
         <div id="reader"></div>
         <div id="infoScan" style="text-align:center; font-weight:bold; margin-bottom:15px;">Scan QR Pegawai</div>
         
-        <div id="jarakStatus" style="background: #dfe6e9; color: #636e72;">Menginisialisasi GPS...</div>
+        <div id="jarakStatus" style="background: #eee; color: #666;">Mendeteksi Lokasi...</div>
 
         <div style="display:flex; gap:10px; margin-bottom:20px;">
             <button id="btnIn" class="btn-absen masuk" onclick="prosesAbsen('Masuk')" disabled>Check In</button>
@@ -73,11 +72,13 @@
         <h3>Pendaftaran Pegawai</h3>
         <input type="text" id="regNama" placeholder="Nama Lengkap Pegawai...">
         <button class="btn-primary" onclick="simpanPegawai()">Simpan Ke Cloud</button>
+
         <div id="qrcode-container" style="display:none; text-align:center; margin-top:20px; padding:15px; border:2px dashed #ccc; border-radius:10px;">
             <div id="qrcode" style="display:flex; justify-content:center;"></div>
             <p id="qrLabel" style="font-weight:bold; margin-top:10px;"></p>
             <button class="btn-primary" style="width:auto; padding:8px 20px;" onclick="window.print()">Cetak QR</button>
         </div>
+
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px;">
             <h4 style="margin:0">Daftar Pegawai</h4>
             <button class="btn-excel" onclick="exportExcelPegawai()">💾 Export Excel</button>
@@ -103,16 +104,25 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     
-    // --- KONFIGURASI LOKASI KANTOR ---
-    const LAT_KANTOR = -7.716884146853014; // Ganti dengan Latitude kantor Anda
-    const LON_KANTOR = 112.0677810812019; // Ganti dengan Longitude kantor Anda
-    const RADIUS_MAKS = 100; // Radius dalam meter
+    // --- KONFIGURASI RADIUS ---
+    const LAT_KANTOR = -7.716884146853014; // Ganti koordinat kantor Anda
+    const LON_KANTOR = 112.0677810812019; 
+    const MAX_JARAK = 100; // Meter
     
     let namaTerdeteksi = "";
     let diDalamRadius = false;
+    window.cekAbsen = { masuk: false, pulang: false };
 
-    // Fungsi Hitung Jarak
-    function getDistance(lat1, lon1, lat2, lon2) {
+    // Fungsi Suara
+    function bicara(teks) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(teks);
+        msg.lang = 'id-ID';
+        window.speechSynthesis.speak(msg);
+    }
+
+    // Hitung Jarak
+    function hitungJarak(lat1, lon1, lat2, lon2) {
         const R = 6371e3;
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -122,41 +132,35 @@
         return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
     }
 
-    // Pantau Lokasi Secara Real-time
-    function startTracking() {
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition((pos) => {
-                const jarak = getDistance(pos.coords.latitude, pos.coords.longitude, LAT_KANTOR, LON_KANTOR);
-                const statusEl = document.getElementById('jarakStatus');
-                
-                if (jarak <= RADIUS_MAKS) {
-                    diDalamRadius = true;
-                    statusEl.innerHTML = `✅ Area Terjangkau (${Math.round(jarak)}m)`;
-                    statusEl.style.background = "#2ecc71"; statusEl.style.color = "#fff";
-                } else {
-                    diDalamRadius = false;
-                    statusEl.innerHTML = `❌ Di Luar Radius (${Math.round(jarak)}m)`;
-                    statusEl.style.background = "#e74c3c"; statusEl.style.color = "#fff";
-                }
-                updateTombolState();
-            }, (err) => {
-                document.getElementById('jarakStatus').innerHTML = "⚠️ Izin Lokasi Ditolak!";
-            }, { enableHighAccuracy: true });
+    // Update Status Tombol (Jarak + Database)
+    function updateTombolState() {
+        const btnIn = document.getElementById('btnIn');
+        const btnOut = document.getElementById('btnOut');
+
+        if (namaTerdeteksi !== "" && diDalamRadius) {
+            btnIn.disabled = window.cekAbsen.masuk;
+            btnOut.disabled = !(window.cekAbsen.masuk && !window.cekAbsen.pulang);
+        } else {
+            btnIn.disabled = true;
+            btnOut.disabled = true;
         }
     }
 
-    function updateTombolState() {
-        // Tombol HANYA bisa diklik jika (1) Nama terdeteksi DAN (2) Di dalam radius
-        const lock = !(namaTerdeteksi !== "" && diDalamRadius);
-        document.getElementById('btnIn').disabled = lock;
-        document.getElementById('btnOut').disabled = lock;
-    }
-
-    function bicara(teks) {
-        window.speechSynthesis.cancel();
-        const msg = new SpeechSynthesisUtterance(teks);
-        msg.lang = 'id-ID';
-        window.speechSynthesis.speak(msg);
+    // Monitoring Lokasi GPS
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition((pos) => {
+            const jarak = hitungJarak(pos.coords.latitude, pos.coords.longitude, LAT_KANTOR, LON_KANTOR);
+            diDalamRadius = jarak <= MAX_JARAK;
+            const el = document.getElementById('jarakStatus');
+            if (diDalamRadius) {
+                el.innerHTML = `✅ Area Terjangkau (${Math.round(jarak)}m)`;
+                el.style.background = "#2ecc71"; el.style.color = "#fff";
+            } else {
+                el.innerHTML = `❌ Luar Radius (${Math.round(jarak)}m)`;
+                el.style.background = "#e74c3c"; el.style.color = "#fff";
+            }
+            updateTombolState();
+        }, () => { alert("Aktifkan GPS!"); }, { enableHighAccuracy: true });
     }
 
     function openTab(id) {
@@ -166,33 +170,39 @@
         document.getElementById(id === 'tab-absen' ? 'tabAbsenBtn' : 'tabPegawaiBtn').classList.add('active');
     }
 
-    // Tampilkan Log
-    db.ref('log_absen').on('value', (snap) => {
-        let html = ""; let arr = [];
-        const tglHariIni = new Date().toLocaleDateString('id-ID');
-        snap.forEach(c => {
-            const data = c.val();
-            if(new Date(data.ts).toLocaleDateString('id-ID') === tglHariIni) arr.push(data);
-        });
-        arr.reverse().forEach(i => {
-            let warna = i.status === "Terlambat" ? "#e74c3c" : "#2ecc71";
-            if(i.tipe === "Pulang") warna = "#3498db";
-            html += `<tr><td><strong>${i.nama}</strong></td><td>${i.tipe}</td><td>${i.waktu}</td><td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td></tr>`;
-        });
-        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4' style='text-align:center'>Belum ada absensi hari ini</td></tr>";
-    });
-
+    // Cek Status Absen Hari Ini
     function checkStatusAbsen(nama) {
-        // Logika check status tetap sama, tapi di akhir kita panggil updateTombolState
         namaTerdeteksi = nama;
-        document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${nama}</span>`;
-        updateTombolState();
+        const tglHariIni = new Date().toLocaleDateString('id-ID');
+        db.ref('log_absen').once('value', (snap) => {
+            let sdhM = false; let sdhP = false;
+            snap.forEach(c => {
+                const log = c.val();
+                if(log.nama === nama && new Date(log.ts).toLocaleDateString('id-ID') === tglHariIni) {
+                    if(log.tipe === "Masuk") sdhM = true;
+                    if(log.tipe === "Pulang") sdhP = true;
+                }
+            });
+            window.cekAbsen = { masuk: sdhM, pulang: sdhP };
+            
+            // Pesan Suara Status Saat Scan
+            if (sdhM && sdhP) {
+                bicara(`Halo ${nama}, Anda sudah lengkap absen hari ini.`);
+            } else if (sdhM) {
+                bicara(`Halo ${nama}, sudah absen masuk. Silakan klik absen pulang.`);
+            } else {
+                bicara(`Halo ${nama}, silakan absen masuk.`);
+            }
+
+            document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${nama}</span>`;
+            updateTombolState();
+        });
     }
 
     function prosesAbsen(tipe) {
-        // Proteksi tambahan di dalam fungsi
+        // Peringatan suara jika memaksa klik (jarak jauh)
         if (!diDalamRadius) {
-            alert("Anda berada di luar radius!");
+            bicara(`Maaf ${namaTerdeteksi}, Anda masih di luar radius kantor.`);
             return;
         }
 
@@ -203,20 +213,29 @@
         db.ref('log_absen').push({
             nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, status: status, ts: Date.now()
         }).then(() => {
-            bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
+            bicara(`Absen ${tipe} berhasil. Terima kasih.`);
             alert(`Absen ${tipe} Berhasil!`);
+            checkStatusAbsen(namaTerdeteksi);
         });
     }
 
-    // Jalankan Tracking Lokasi
-    startTracking();
-
-    let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-    scanner.render((txt) => {
-        checkStatusAbsen(txt);
+    // Log Absensi
+    db.ref('log_absen').on('value', (snap) => {
+        let html = ""; let arr = [];
+        const tgl = new Date().toLocaleDateString('id-ID');
+        snap.forEach(c => { if(new Date(c.val().ts).toLocaleDateString('id-ID') === tgl) arr.push(c.val()); });
+        arr.reverse().forEach(i => {
+            let warna = i.status === "Terlambat" ? "#e74c3c" : "#2ecc71";
+            if(i.tipe === "Pulang") warna = "#3498db";
+            html += `<tr><td><strong>${i.nama}</strong></td><td>${i.tipe}</td><td>${i.waktu}</td><td><span class="badge" style="background:${warna}">${i.status}</span></td></tr>`;
+        });
+        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4' style='text-align:center'>Belum ada data hari ini</td></tr>";
     });
 
-    // --- FUNGSI ADMIN TETAP SAMA ---
+    let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+    scanner.render((txt) => { checkStatusAbsen(txt); });
+
+    // --- FUNGSI ADMIN ---
     function exportExcelAbsensi() {
         db.ref('log_absen').once('value', (snap) => {
             let data = [];
@@ -226,7 +245,7 @@
             });
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Riwayat Absensi");
+            XLSX.utils.book_append_sheet(wb, ws, "Riwayat");
             XLSX.writeFile(wb, "Laporan_Absensi.xlsx");
         });
     }
