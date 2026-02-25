@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Suara Peringatan Full</title>
+    <title>Absensi Pro - Final Fixed</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -31,8 +31,6 @@
         .btn-absen { flex:1; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; color:white; transition: 0.3s; }
         .btn-absen.masuk { background:#2ecc71; }
         .btn-absen.pulang { background:#e74c3c; }
-        
-        /* Visual Locked tetap ada tapi pointer tetap aktif agar bisa diklik untuk suara */
         .btn-absen.locked { background:#bdc3c7 !important; opacity: 0.7; }
         
         #jarakStatus { text-align:center; font-size: 0.85em; margin-bottom: 10px; font-weight: bold; padding: 8px; border-radius: 8px; }
@@ -72,11 +70,21 @@
         <h3>Pendaftaran Pegawai</h3>
         <input type="text" id="regNama" placeholder="Nama Lengkap Pegawai...">
         <button class="btn-primary" onclick="simpanPegawai()">Simpan Ke Cloud</button>
+
         <div id="qrcode-container" style="display:none; text-align:center; margin-top:20px; padding:15px; border:2px dashed #ccc; border-radius:10px;">
             <div id="qrcode" style="display:flex; justify-content:center;"></div>
             <p id="qrLabel" style="font-weight:bold; margin-top:10px;"></p>
+            <button class="btn-primary" style="width:auto; padding:8px 20px;" onclick="window.print()">Cetak QR</button>
         </div>
-        <div id="listPegawai"></div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px;">
+            <h4 style="margin:0">Daftar Pegawai</h4>
+            <button class="btn-excel" onclick="exportExcelPegawai()">💾 Export Excel</button>
+        </div>
+        <table>
+            <thead><tr><th>Nama Pegawai</th><th>Aksi</th></tr></thead>
+            <tbody id="listPegawai"></tbody>
+        </table>
     </div>
 </div>
 
@@ -94,8 +102,9 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     
+    // --- SETTING RADIUS ---
     const LAT_KANTOR = -7.716846501344563; 
-    const LON_KANTOR = 112.0677810812019; 
+    const LON_KANTOR = 112.06776955014226; 
     const MAX_JARAK = 100; 
     
     let namaTerdeteksi = "";
@@ -119,11 +128,10 @@
         return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
     }
 
-    // Update Visual Tombol (Tanpa disabled agar bisa diklik untuk trigger suara)
     function updateTombolState() {
         const btnIn = document.getElementById('btnIn');
         const btnOut = document.getElementById('btnOut');
-
+        // Visual locked jika sudah absen
         if(window.cekAbsen.masuk) btnIn.classList.add('locked'); else btnIn.classList.remove('locked');
         if(window.cekAbsen.pulang) btnOut.classList.add('locked'); else btnOut.classList.remove('locked');
     }
@@ -176,7 +184,7 @@
             return;
         }
 
-        // 2. CEK STATUS ABSEN (Logika Pesan Suara Peringatan)
+        // 2. CEK STATUS ABSEN (Logika Pesan Suara Peringatan Spesifik)
         if (tipe === "Masuk") {
             if (window.cekAbsen.masuk) {
                 if (window.cekAbsen.pulang) {
@@ -184,7 +192,7 @@
                 } else {
                     bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk.`);
                 }
-                return; // Berhenti di sini, jangan simpan ke database
+                return; 
             }
         }
 
@@ -199,7 +207,7 @@
             }
         }
 
-        // 3. JIKA LOLOS, SIMPAN KE FIREBASE
+        // 3. JIKA LOLOS, SIMPAN
         const skrg = new Date();
         const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
         let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
@@ -213,7 +221,24 @@
         });
     }
 
-    // Log & Admin logic (tetap sama)
+    // UPDATE DAFTAR PEGAWAI (Perbaikan Tampilan)
+    db.ref('pegawai').on('value', (snap) => {
+        let html = "";
+        snap.forEach(c => {
+            const data = c.val();
+            html += `<tr>
+                <td><strong>${data.nama}</strong></td>
+                <td>
+                    <button class="btn-action btn-edit" onclick="editPegawai('${c.key}', '${data.nama}')">Edit</button>
+                    <button class="btn-action btn-hapus" onclick="hapusPegawai('${c.key}')">Hapus</button>
+                    <button class="btn-action btn-qr" onclick="tampilQR('${data.nama}')">QR</button>
+                </td>
+            </tr>`;
+        });
+        document.getElementById('listPegawai').innerHTML = html;
+    });
+
+    // Sisa fungsi log & admin lainnya...
     db.ref('log_absen').on('value', (snap) => {
         let html = ""; let arr = [];
         const tgl = new Date().toLocaleDateString('id-ID');
@@ -228,33 +253,6 @@
 
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render((txt) => { checkStatusAbsen(txt); });
-
-    function exportExcelAbsensi() {
-        db.ref('log_absen').once('value', (snap) => {
-            let data = [];
-            snap.forEach(c => {
-                const i = c.val();
-                data.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Keterangan: i.status });
-            });
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Riwayat");
-            XLSX.writeFile(wb, "Laporan_Absensi.xlsx");
-        });
-    }
-
-    db.ref('pegawai').on('value', (snap) => {
-        let html = "";
-        snap.forEach(c => {
-            const data = c.val();
-            html += `<tr><td>${data.nama}</td><td>
-                <button class="btn-action btn-edit" onclick="editPegawai('${c.key}', '${data.nama}')">Edit</button>
-                <button class="btn-action btn-hapus" onclick="hapusPegawai('${c.key}')">Hapus</button>
-                <button class="btn-action btn-qr" onclick="tampilQR('${data.nama}')">QR</button>
-            </td></tr>`;
-        });
-        document.getElementById('listPegawai').innerHTML = html;
-    });
 
     function simpanPegawai() {
         const n = document.getElementById('regNama').value.trim();
@@ -271,6 +269,26 @@
         new QRCode(document.getElementById('qrcode'), { text: n, width: 120, height: 120 });
         document.getElementById('qrLabel').innerText = n;
     }
-</script>
-</body>
-</html>
+    function exportExcelAbsensi() {
+        db.ref('log_absen').once('value', (snap) => {
+            let data = [];
+            snap.forEach(c => {
+                const i = c.val();
+                data.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Keterangan: i.status });
+            });
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Riwayat");
+            XLSX.writeFile(wb, "Laporan_Absensi.xlsx");
+        });
+    }
+    function exportExcelPegawai() {
+        db.ref('pegawai').once('value', (snap) => {
+            let data = [];
+            snap.forEach(childSnap => {
+                const i = childSnap.val();
+                if (i.nama) data.push({ "Nama Pegawai": i.nama });
+            });
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
