@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Final</title>
+    <title>Absensi Pro - Suara Aktif</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -27,6 +27,12 @@
         input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
         .btn-primary { background: #3498db; color: white; width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .badge { padding: 4px 8px; border-radius: 5px; font-size: 0.75em; color: white; font-weight: bold; }
+        
+        /* Style baru untuk tombol absen */
+        .btn-absen { flex:1; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; color:white; transition: 0.3s; }
+        .btn-absen.masuk { background:#2ecc71; }
+        .btn-absen.pulang { background:#e74c3c; }
+        .btn-absen.locked { background:#bdc3c7; cursor:not-allowed; opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -41,8 +47,8 @@
         <div id="reader"></div>
         <div id="infoScan" style="text-align:center; font-weight:bold; margin-bottom:15px;">Scan QR Pegawai</div>
         <div style="display:flex; gap:10px; margin-bottom:20px;">
-            <button id="btnIn" style="flex:1; background:#2ecc71; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold;" onclick="prosesAbsen('Masuk')" disabled>Check In</button>
-            <button id="btnOut" style="flex:1; background:#e74c3c; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold;" onclick="prosesAbsen('Pulang')" disabled>Check Out</button>
+            <button id="btnIn" class="btn-absen masuk" onclick="prosesAbsen('Masuk')">Check In</button>
+            <button id="btnOut" class="btn-absen pulang" onclick="prosesAbsen('Pulang')">Check Out</button>
         </div>
         
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -92,8 +98,10 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     let namaTerdeteksi = "";
+    window.cekAbsen = { masuk: false, pulang: false };
 
     function bicara(teks) {
+        window.speechSynthesis.cancel(); // Hentikan suara sebelumnya agar tidak tumpang tindih
         const msg = new SpeechSynthesisUtterance(teks);
         msg.lang = 'id-ID';
         window.speechSynthesis.speak(msg);
@@ -123,79 +131,89 @@
         document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4' style='text-align:center'>Belum ada absensi hari ini</td></tr>";
     });
 
-    // Fitur Absen Sekali Sehari
-// 1. Fungsi Cek Status (Hanya update tombol, TANPA pesan suara)
-function checkStatusAbsen(nama) {
-    const tglHariIni = new Date().toLocaleDateString('id-ID');
-    db.ref('log_absen').once('value', (snap) => {
-        let sdhMasuk = false; 
-        let sdhPulang = false;
+    function checkStatusAbsen(nama) {
+        const tglHariIni = new Date().toLocaleDateString('id-ID');
+        db.ref('log_absen').once('value', (snap) => {
+            let sdhMasuk = false; 
+            let sdhPulang = false;
 
-        snap.forEach(c => {
-            const log = c.val();
-            const tglLog = new Date(log.ts).toLocaleDateString('id-ID');
-            if(log.nama === nama && tglLog === tglHariIni) {
-                if(log.tipe === "Masuk") sdhMasuk = true;
-                if(log.tipe === "Pulang") sdhPulang = true;
+            snap.forEach(c => {
+                const log = c.val();
+                const tglLog = new Date(log.ts).toLocaleDateString('id-ID');
+                if(log.nama === nama && tglLog === tglHariIni) {
+                    if(log.tipe === "Masuk") sdhMasuk = true;
+                    if(log.tipe === "Pulang") sdhPulang = true;
+                }
+            });
+
+            window.cekAbsen = { masuk: sdhMasuk, pulang: sdhPulang };
+
+            // Update visual tombol tanpa menonaktifkan klik
+            const btnIn = document.getElementById('btnIn');
+            const btnOut = document.getElementById('btnOut');
+
+            if(sdhMasuk) btnIn.classList.add('locked'); else btnIn.classList.remove('locked');
+            if(!sdhMasuk || sdhPulang) btnOut.classList.add('locked'); else btnOut.classList.remove('locked');
+            
+            if(sdhMasuk && sdhPulang) {
+                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Lengkap)</span>`;
+            } else {
+                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${nama}</span>`;
             }
         });
+    }
 
-        // Simpan status ke memori untuk dibaca saat tombol diklik
-        window.cekAbsen = { masuk: sdhMasuk, pulang: sdhPulang };
-
-        // Aktifkan/Nonaktifkan tombol secara visual
-        document.getElementById('btnIn').disabled = sdhMasuk;
-        document.getElementById('btnOut').disabled = (!sdhMasuk || sdhPulang);
-        
-        if(sdhMasuk && sdhPulang) {
-            document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sdh Absen Lengkap)</span>`;
-        } else {
-            document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${nama}</span>`;
+    function prosesAbsen(tipe) {
+        if (!namaTerdeteksi) {
+            alert("Scan QR Pegawai Terlebih Dahulu!");
+            return;
         }
-    });
-}
 
-function prosesAbsen(tipe) {
-    // Pastikan variabel cekAbsen ada
-    if (!window.cekAbsen) window.cekAbsen = { masuk: false, pulang: false };
+        // --- LOGIKA SUARA PERINGATAN ---
+        if (tipe === "Masuk" && window.cekAbsen.masuk) {
+            if (!window.cekAbsen.pulang) {
+                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk. Silakan absen pulang nanti.`);
+            } else {
+                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk dan pulang hari ini.`);
+            }
+            return; 
+        }
 
-    // Validasi Suara Peringatan
-    if (tipe === "Masuk" && window.cekAbsen.masuk) {
-        bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk hari ini.`);
-        alert(`Anda sudah absen masuk hari ini!`); // Tambah alert agar browser "bangun"
-        return;
+        if (tipe === "Pulang") {
+            if (!window.cekAbsen.masuk) {
+                bicara(`Maaf ${namaTerdeteksi}, Anda belum absen masuk hari ini.`);
+                return;
+            }
+            if (window.cekAbsen.pulang) {
+                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk dan pulang hari ini.`);
+                return; 
+            }
+        }
+
+        // --- JIKA LOLOS VALIDASI, PROSES ABSEN ---
+        const skrg = new Date();
+        const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+        let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
+
+        db.ref('log_absen').push({
+            nama: namaTerdeteksi, 
+            tipe: tipe, 
+            waktu: jamStr, 
+            status: status, 
+            ts: Date.now()
+        }).then(() => {
+            bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
+            alert(`Absen ${tipe} Berhasil!`);
+            checkStatusAbsen(namaTerdeteksi);
+        });
     }
-    if (tipe === "Pulang" && window.cekAbsen.pulang) {
-        bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang hari ini.`);
-        alert(`Anda sudah absen pulang hari ini!`);
-        return;
-    }
-
-    const skrg = new Date();
-    const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
-    let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
-
-    db.ref('log_absen').push({
-        nama: namaTerdeteksi, 
-        tipe: tipe, 
-        waktu: jamStr, 
-        status: status, 
-        ts: Date.now()
-    }).then(() => {
-        bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
-        alert(`Absen ${tipe} Berhasil!`);
-        checkStatusAbsen(namaTerdeteksi);
-    });
-}
 
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render((txt) => {
         namaTerdeteksi = txt;
-        document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${txt}</span>`;
         checkStatusAbsen(txt);
     });
 
-    // EXPORT 1: LAPORAN ABSENSI (LOG)
     function exportExcelAbsensi() {
         db.ref('log_absen').once('value', (snap) => {
             let data = [];
@@ -210,33 +228,20 @@ function prosesAbsen(tipe) {
         });
     }
 
-    // EXPORT 2: KHUSUS DAFTAR PEGAWAI TERDAFTAR
     function exportExcelPegawai() {
-    db.ref('pegawai').once('value', (snap) => {
-        let data = [];
-        // Pastikan melakukan perulangan pada setiap anak (child) di database pegawai
-        snap.forEach(childSnap => {
-            const i = childSnap.val();
-            if (i.nama) {
-                data.push({ "Nama Pegawai": i.nama });
-            }
-        });
-
-        if (data.length === 0) {
-            alert("Tidak ada data pegawai untuk diekspor.");
-            return;
-        }
-
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
-        
-        // Menghasilkan file Excel dengan nama Daftar_Pegawai.xlsx
-        XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
+        db.ref('pegawai').once('value', (snap) => {
+            let data = [];
+            snap.forEach(childSnap => {
+                const i = childSnap.val();
+                if (i.nama) data.push({ "Nama Pegawai": i.nama });
+            });
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
+            XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
         });
     }
 
-    // MENU PEGAWAI (Edit, Hapus, QR tetap di sini)
     db.ref('pegawai').on('value', (snap) => {
         let html = "";
         snap.forEach(c => {
