@@ -3,86 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Fitur Lengkap</title>
+    <title>Sistem Absensi Pro - Update Final</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
-        :root { --bg: #f0f2f5; --card: #ffffff; --text: #2d3436; --border: #eee; }
-        [data-theme="dark"] { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --border: #333; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; transition: 0.3s; }
-        .container { width: 100%; max-width: 600px; background: var(--card); border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
-        .tabs { display: flex; background: rgba(0,0,0,0.05); }
-        .tab-btn { flex: 1; padding: 15px; border: none; cursor: pointer; font-weight: bold; color: #7f8c8d; background: transparent; }
-        .tab-btn.active { background: var(--card); color: #3498db; border-bottom: 3px solid #3498db; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 600px; background: white; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        .tabs { display: flex; background: #ecf0f1; }
+        .tab-btn { flex: 1; padding: 15px; border: none; cursor: pointer; font-weight: bold; color: #7f8c8d; transition: 0.3s; }
+        .tab-btn.active { background: white; color: #2980b9; border-bottom: 3px solid #3498db; }
         .content { padding: 20px; display: none; }
         .content.active { display: block; }
-        #reader { border-radius: 10px; overflow: hidden; background: #000; margin-bottom: 15px; }
+        #reader { border-radius: 10px; overflow: hidden; background: #000; margin-bottom: 15px; min-height: 250px; }
         .status-lokasi { padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; font-size: 0.85em; font-weight: bold; }
         .aman { background: #d4edda; color: #155724; }
         .bahaya { background: #f8d7da; color: #721c24; }
-        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; margin: 2px; }
-        .btn-green { background: #2ecc71; } .btn-red { background: #e74c3c; } .btn-blue { background: #3498db; width: 100%; }
-        .btn-excel { background: #27ae60; font-size: 0.8em; padding: 8px 15px; display: flex; align-items: center; gap: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85em; }
-        th, td { border-bottom: 1px solid var(--border); padding: 12px 10px; text-align: left; }
-        .badge { padding: 4px 8px; border-radius: 5px; font-size: 0.75em; color: white; font-weight: bold; }
-        .theme-toggle { margin-bottom: 10px; align-self: flex-end; cursor: pointer; padding: 8px 15px; background: var(--card); border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { padding: 12px 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; margin: 2px; transition: 0.2s; }
+        .btn-green { background: #2ecc71; }
+        .btn-red { background: #e74c3c; }
+        .btn-blue { background: #3498db; width: 100%; }
+        button:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em; }
+        th, td { border-bottom: 1px solid #eee; padding: 12px 8px; text-align: left; }
+        .badge { padding: 3px 8px; border-radius: 5px; font-size: 0.8em; color: white; font-weight: bold; }
+        .qr-area { text-align: center; margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 10px; border: 1px dashed #ccc; }
     </style>
 </head>
-<body data-theme="light">
-
-<div class="theme-toggle" onclick="toggleTheme()">🌓 Ganti Mode</div>
+<body>
 
 <div class="container">
     <div class="tabs">
-        <button id="tabAbsenBtn" class="tab-btn active" onclick="openTab('tab-absen')">Absensi</button>
-        <button id="tabPegawaiBtn" class="tab-btn" onclick="openTab('tab-admin')">Daftar Pegawai</button>
+        <button class="tab-btn active" onclick="openTab('tab-absen')">Absensi</button>
+        <button class="tab-btn" onclick="openTab('tab-admin')">Daftar Pegawai</button>
     </div>
 
     <div id="tab-absen" class="content active">
         <div id="statusLokasi" class="status-lokasi bahaya">Mengecek GPS...</div>
         <div id="reader"></div>
-        <div id="infoScan" style="text-align: center; margin-bottom: 15px; font-weight: bold;">Scan QR Pegawai</div>
+        <div id="infoScan" style="text-align: center; margin-bottom: 15px; font-weight: bold;">Silakan Scan QR Code Pegawai</div>
         
         <div style="display: flex; gap: 10px;">
             <button id="btnIn" class="btn-green" style="flex:1" onclick="prosesAbsen('Masuk')" disabled>Check In</button>
             <button id="btnOut" class="btn-red" style="flex:1" onclick="prosesAbsen('Pulang')" disabled>Check Out</button>
         </div>
-
-        <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid var(--border); padding-top: 15px;">
-            <h4 style="margin:0">Riwayat Hari Ini</h4>
-            <button class="btn-excel" onclick="exportLogAbsen()">📊 Export Excel</button>
+        
+        <div style="margin-top: 25px; display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0;">Riwayat Hari Ini</h4>
+            <button onclick="exportLogAbsen()" style="background:#27ae60; font-size:0.7em; padding:5px 10px;">💾 Download Excel</button>
         </div>
         <table>
-            <thead><tr><th>Nama</th><th>Tipe</th><th>Jam</th><th>Ket</th></tr></thead>
-            <tbody id="logAbsen"></tbody>
+            <thead>
+                <tr><th>Nama</th><th>Tipe</th><th>Jam</th><th>Ket</th></tr>
+            </thead>
+            <tbody id="logAbsen">
+                <tr><td colspan="4" style="text-align:center">Memuat data...</td></tr>
+            </tbody>
         </table>
     </div>
 
     <div id="tab-admin" class="content">
-        <h3>Tambah Pegawai Baru</h3>
-        <input type="text" id="regNama" placeholder="Nama Lengkap Pegawai..." style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--text);">
-        <button class="btn-blue" onclick="simpanPegawai()">Simpan & Buat QR</button>
+        <h3>Pendaftaran Pegawai</h3>
+        <input type="text" id="regNama" placeholder="Ketik Nama Lengkap Pegawai...">
+        <button class="btn-blue" onclick="simpanPegawai()">Daftarkan ke Cloud</button>
         
-        <div id="qrPrint" style="display:none; text-align:center; margin-top:20px; padding:20px; border:2px dashed #3498db; border-radius:10px; background: #fff;">
-            <div id="qrcode" style="display:flex; justify-content:center; margin-bottom:10px;"></div>
-            <p id="qrLabel" style="font-weight:bold; color:#2d3436; margin:0;"></p>
-            <button class="btn-blue" style="width:auto; background:#7f8c8d; margin-top:10px;" onclick="window.print()">Print QR</button>
+        <div id="qrPrint" class="qr-area" style="display: none;">
+            <div id="qrcode" style="display: flex; justify-content: center;"></div>
+            <p id="qrLabel" style="font-weight: bold; margin-top: 10px;"></p>
+            <button class="btn-blue" style="width: auto; background: #95a5a6;" onclick="window.print()">Cetak QR</button>
         </div>
 
-        <h4 style="margin-top:30px; border-top:1px solid var(--border); padding-top:15px;">Daftar Pegawai (Klik Nama untuk Edit)</h4>
-        <table>
-            <thead><tr><th>Nama</th><th>Aksi</th></tr></thead>
-            <tbody id="listPegawai"></tbody>
-        </table>
+        <div style="margin-top: 30px; border-top: 2px solid #eee; padding-top: 15px;">
+            <h4>List Pegawai (Cloud)</h4>
+            <table>
+                <thead><tr><th>Nama</th><th>Aksi</th></tr></thead>
+                <tbody id="listPegawai"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <script>
-    // 1. CONFIG FIREBASE
+    // ======= 1. FIREBASE CONFIG (DARI GAMBAR ANDA) =======
     const firebaseConfig = {
         apiKey: "AIzaSyCMu-Bfd1GQWIoT1CnInPtWcIDCJkhSIgQ",
         authDomain: "absensi-kantor-cf8b7.firebaseapp.com",
@@ -93,9 +98,11 @@
         appId: "1:287648038826:web:15c9e546d66162980f75d3"
     };
 
+    // ======= 2. SETTING KANTOR & ATURAN =======
     const LAT_KANTOR = -7.716884146853014; 
     const LON_KANTOR = 112.0677810812019; 
-    const RAD_MAKS = 100;
+    const RAD_MAKS = 100; // Meter
+    const JAM_MASUK_MAKS = "08:00";
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -103,150 +110,181 @@
     let namaTerdeteksi = "";
     let dataMasukHariIni = null;
 
-    // FITUR: TEMA & SUARA
-    function toggleTheme() {
-        const b = document.body;
-        b.setAttribute('data-theme', b.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
-    }
-
-    function bicara(teks) {
-        const msg = new SpeechSynthesisUtterance(teks);
-        msg.lang = 'id-ID';
-        window.speechSynthesis.speak(msg);
-    }
-
     function openTab(id) {
         document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        if(id === 'tab-absen') document.getElementById('tabAbsenBtn').classList.add('active');
-        else document.getElementById('tabPegawaiBtn').classList.add('active');
+        event.currentTarget.classList.add('active');
     }
 
-    // SCAN & LOGIKA ABSEN
+    // LOGIKA SCAN QR
     function onScanSuccess(decodedText) {
         const nama = decodedText.trim();
         db.ref('pegawai').once('value', (snap) => {
-            let userExist = false;
-            snap.forEach(c => { if(c.val().nama.toLowerCase() === nama.toLowerCase()) userExist = true; });
-            if(userExist) {
+            let userFound = false;
+            snap.forEach(child => {
+                if(child.val().nama.toLowerCase() === nama.toLowerCase()) userFound = true;
+            });
+
+            if(userFound) {
                 namaTerdeteksi = nama;
-                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#2ecc71">${nama}</span>`;
-                checkAbsenLimit(nama);
+                document.getElementById('infoScan').innerHTML = `Terdeteksi: <span style="color:green">${nama}</span>`;
+                checkLimitHarian(nama);
             } else {
-                document.getElementById('infoScan').innerHTML = `<span style="color:#e74c3c">QR Tidak Dikenal!</span>`;
+                document.getElementById('infoScan').innerHTML = `<span style="color:red">QR "${nama}" Tidak Terdaftar!</span>`;
+                resetTombol();
             }
         });
     }
 
-    function checkAbsenLimit(nama) {
-        const tgl = new Date().toLocaleDateString('id-ID');
+    function checkLimitHarian(nama) {
+        const tglHariIni = new Date().toLocaleDateString('id-ID');
         db.ref('log_absen').once('value', (snap) => {
-            let sdhIn = false; let sdhOut = false;
-            snap.forEach(c => {
-                const log = c.val();
-                if(log.nama === nama && new Date(log.ts).toLocaleDateString('id-ID') === tgl) {
-                    if(log.tipe === 'Masuk') { sdhIn = true; dataMasukHariIni = log; }
-                    if(log.tipe === 'Pulang') sdhOut = true;
+            let sdhMasuk = false;
+            let sdhPulang = false;
+            dataMasukHariIni = null;
+
+            snap.forEach(child => {
+                const log = child.val();
+                if(log.nama === nama && new Date(log.ts).toLocaleDateString('id-ID') === tglHariIni) {
+                    if(log.tipe === 'Masuk') { sdhMasuk = true; dataMasukHariIni = log; }
+                    if(log.tipe === 'Pulang') sdhPulang = true;
                 }
             });
-            document.getElementById('btnIn').disabled = (sdhIn || !lokasiOk);
-            document.getElementById('btnOut').disabled = (sdhOut || !lokasiOk || !sdhIn);
+
+            const bIn = document.getElementById('btnIn');
+            const bOut = document.getElementById('btnOut');
+
+            bIn.disabled = (sdhMasuk || !lokasiOk);
+            bIn.innerText = sdhMasuk ? "Sudah Masuk" : "Check In";
+
+            bOut.disabled = (sdhPulang || !lokasiOk || !sdhMasuk);
+            bOut.innerText = sdhPulang ? "Sudah Pulang" : "Check Out";
         });
+    }
+
+    function resetTombol() {
+        document.getElementById('btnIn').disabled = true;
+        document.getElementById('btnOut').disabled = true;
     }
 
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render(onScanSuccess);
 
+    // PROSES SIMPAN KE FIREBASE
     function prosesAbsen(tipe) {
         const skrg = new Date();
         const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
-        let status = tipe === 'Masuk' ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "-";
+        let status = "-";
         let durasi = "-";
 
-        if(tipe === 'Pulang' && dataMasukHariIni) {
+        if(tipe === 'Masuk') {
+            status = (jamStr > JAM_MASUK_MAKS) ? "Terlambat" : "Tepat Waktu";
+        } else if(tipe === 'Pulang' && dataMasukHariIni) {
             const diff = skrg.getTime() - dataMasukHariIni.ts;
-            durasi = `${Math.floor(diff/3600000)}j ${Math.floor((diff%3600000)/60000)}m`;
+            const jam = Math.floor(diff / 3600000);
+            const menit = Math.floor((diff % 3600000) / 60000);
+            durasi = `${jam}j ${menit}m`;
         }
 
         db.ref('log_absen').push({
-            nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, ts: firebase.database.ServerValue.TIMESTAMP, status: status, durasi: durasi
+            nama: namaTerdeteksi,
+            tipe: tipe,
+            waktu: jamStr,
+            ts: firebase.database.ServerValue.TIMESTAMP,
+            status: status,
+            durasi: durasi
         }).then(() => {
-            bicara(`Terima kasih ${namaTerdeteksi}, absen ${tipe} berhasil!`);
-            alert("Absen Berhasil!");
+            alert(`Absen ${tipe} Berhasil!`);
             location.reload();
         });
     }
 
-    // UPDATE TABEL & FIX UNDEFINED
+    // UPDATE LOG REALTIME (PERBAIKAN KOLOM KETERANGAN)
     db.ref('log_absen').on('value', (snap) => {
-        let html = ""; let arr = [];
-        snap.forEach(c => arr.push(c.val()));
-        arr.reverse().slice(0, 15).forEach(i => {
-            let teksKet = i.tipe === 'Masuk' ? (i.status && i.status !== "undefined" ? i.status : "Hadir") : (i.durasi || "Selesai");
-            let color = i.tipe === 'Masuk' ? (teksKet === 'Terlambat' ? '#e74c3c' : '#2ecc71') : '#3498db';
-            html += `<tr><td><strong>${i.nama}</strong></td><td>${i.tipe}</td><td>${i.waktu}</td><td><span class="badge" style="background:${color}">${teksKet}</span></td></tr>`;
-        });
-        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4'>Belum ada log</td></tr>";
-    });
+        let html = "";
+        let dataArray = [];
+        snap.forEach(child => { dataArray.push(child.val()); });
 
-    // ADMIN: PEGAWAI & QR
-    db.ref('pegawai').on('value', (snap) => {
-        let h = "";
-        snap.forEach(c => {
-            h += `<tr>
-                <td onclick="editPegawai('${c.key}', '${c.val().nama}')" style="cursor:pointer; color:#3498db"><u>${c.val().nama}</u></td>
-                <td><button class="btn-red" style="padding:5px 10px; font-size:0.8em" onclick="hapusPegawai('${c.key}')">Hapus</button></td>
+        dataArray.reverse().slice(0, 15).forEach(i => {
+            let labelKet = "";
+            if(i.tipe === 'Masuk') {
+                const warna = i.status === 'Terlambat' ? '#e74c3c' : '#27ae60';
+                labelKet = `<span class="badge" style="background:${warna}">${i.status || 'Hadir'}</span>`;
+            } else {
+                labelKet = `<small style="color:#636e72; font-weight:bold">${i.durasi || '-'}</small>`;
+            }
+
+            html += `<tr>
+                <td><strong>${i.nama}</strong></td>
+                <td>${i.tipe}</td>
+                <td>${i.waktu}</td>
+                <td>${labelKet}</td>
             </tr>`;
         });
-        document.getElementById('listPegawai').innerHTML = h;
+        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4' style='text-align:center'>Belum ada log</td></tr>";
     });
 
+    // ADMIN: SIMPAN PEGAWAI
     function simpanPegawai() {
-        const n = document.getElementById('regNama').value.trim();
-        if(n) db.ref('pegawai').push({ nama: n }).then(() => {
+        const nama = document.getElementById('regNama').value.trim();
+        if(!nama) return alert("Isi nama dulu!");
+        db.ref('pegawai').push({ nama: nama }).then(() => {
             document.getElementById('qrcode').innerHTML = "";
-            new QRCode(document.getElementById('qrcode'), { text: n, width: 150, height: 150 });
-            document.getElementById('qrLabel').innerText = n;
+            new QRCode(document.getElementById('qrcode'), { text: nama, width: 160, height: 160 });
+            document.getElementById('qrLabel').innerText = nama;
             document.getElementById('qrPrint').style.display = "block";
             document.getElementById('regNama').value = "";
         });
     }
 
-    function editPegawai(key, namaLama) {
-        const baru = prompt("Edit Nama Pegawai:", namaLama);
-        if(baru && baru !== namaLama) db.ref('pegawai/' + key).update({ nama: baru });
-    }
+    db.ref('pegawai').on('value', (snap) => {
+        let html = "";
+        snap.forEach(c => {
+            html += `<tr><td>${c.val().nama}</td><td><button class="btn-red" style="padding:5px 10px" onclick="hapusPegawai('${c.key}')">Hapus</button></td></tr>`;
+        });
+        document.getElementById('listPegawai').innerHTML = html;
+    });
 
-    function hapusPegawai(k) { if(confirm("Hapus pegawai ini?")) db.ref('pegawai/' + k).remove(); }
+    function hapusPegawai(key) { if(confirm("Hapus pegawai?")) db.ref('pegawai/' + key).remove(); }
 
-    // FITUR EXPORT EXCEL
+    // EXPORT EXCEL
     function exportLogAbsen() {
         db.ref('log_absen').once('value', s => {
             const list = [];
             s.forEach(c => {
-                const i = c.val();
-                list.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Status: i.status, Durasi: i.durasi });
+                const d = c.val();
+                list.push({
+                    Tanggal: new Date(d.ts).toLocaleDateString('id-ID'),
+                    Nama: d.nama,
+                    Tipe: d.tipe,
+                    Jam: d.waktu,
+                    Status: d.status,
+                    Durasi_Kerja: d.durasi
+                });
             });
             const ws = XLSX.utils.json_to_sheet(list);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Rekap_Absen");
-            XLSX.writeFile(wb, "Laporan_Absensi_Kantor.xlsx");
+            XLSX.utils.book_append_sheet(wb, ws, "Laporan");
+            XLSX.writeFile(wb, `Absensi_${new Date().toLocaleDateString()}.xlsx`);
         });
     }
 
     // GEOLOCATION
-    navigator.geolocation.watchPosition(p => {
-        const d = hitungJarak(p.coords.latitude, p.coords.longitude, LAT_KANTOR, LON_KANTOR);
-        lokasiOk = d <= RAD_MAKS;
+    navigator.geolocation.watchPosition(pos => {
+        const dist = hitungJarak(pos.coords.latitude, pos.coords.longitude, LAT_KANTOR, LON_KANTOR);
+        lokasiOk = dist <= RAD_MAKS;
         const el = document.getElementById('statusLokasi');
-        el.innerText = `${lokasiOk ? 'Lokasi OK' : 'Diluar Area'} (${Math.round(d)}m)`;
+        el.innerText = `${lokasiOk ? 'Lokasi OK' : 'Diluar Area'} (${Math.round(dist)}m)`;
         el.className = `status-lokasi ${lokasiOk ? 'aman' : 'bahaya'}`;
-    }, null, { enableHighAccuracy: true });
+    }, err => {
+        document.getElementById('statusLokasi').innerText = "GPS tidak aktif / diblokir";
+    }, { enableHighAccuracy: true });
 
     function hitungJarak(lat1, lon1, lat2, lon2) {
         const R = 6371000;
-        const dLat = (lat2-lat1)*Math.PI/180; const dLon = (lon2-lon1)*Math.PI/180;
+        const dLat = (lat2-lat1)*Math.PI/180;
+        const dLon = (lon2-lon1)*Math.PI/180;
         const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
