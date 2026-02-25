@@ -3,91 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Absensi Pro - Update Final</title>
+    <title>Absensi Pro - Dark Mode & Voice</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 600px; background: white; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
-        .tabs { display: flex; background: #ecf0f1; }
-        .tab-btn { flex: 1; padding: 15px; border: none; cursor: pointer; font-weight: bold; color: #7f8c8d; transition: 0.3s; }
-        .tab-btn.active { background: white; color: #2980b9; border-bottom: 3px solid #3498db; }
+        :root {
+            --bg-body: #f0f2f5; --bg-card: #ffffff; --text-main: #2d3436;
+            --tab-bg: #ecf0f1; --border: #eee;
+        }
+        [data-theme="dark"] {
+            --bg-body: #121212; --bg-card: #1e1e1e; --text-main: #e0e0e0;
+            --tab-bg: #2d3436; --border: #333;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; transition: 0.3s; }
+        .container { width: 100%; max-width: 600px; background: var(--bg-card); border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        .tabs { display: flex; background: var(--tab-bg); }
+        .tab-btn { flex: 1; padding: 15px; border: none; cursor: pointer; font-weight: bold; color: #7f8c8d; background: transparent; }
+        .tab-btn.active { background: var(--bg-card); color: #3498db; border-bottom: 3px solid #3498db; }
         .content { padding: 20px; display: none; }
         .content.active { display: block; }
-        #reader { border-radius: 10px; overflow: hidden; background: #000; margin-bottom: 15px; min-height: 250px; }
+        #reader { border-radius: 10px; overflow: hidden; background: #000; margin-bottom: 15px; }
         .status-lokasi { padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; font-size: 0.85em; font-weight: bold; }
         .aman { background: #d4edda; color: #155724; }
         .bahaya { background: #f8d7da; color: #721c24; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        button { padding: 12px 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; margin: 2px; transition: 0.2s; }
-        .btn-green { background: #2ecc71; }
-        .btn-red { background: #e74c3c; }
-        .btn-blue { background: #3498db; width: 100%; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; background: var(--bg-card); color: var(--text-main); }
+        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; margin: 2px; }
+        .btn-green { background: #2ecc71; } .btn-red { background: #e74c3c; } .btn-blue { background: #3498db; width: 100%; }
         button:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em; }
-        th, td { border-bottom: 1px solid #eee; padding: 12px 8px; text-align: left; }
-        .badge { padding: 3px 8px; border-radius: 5px; font-size: 0.8em; color: white; font-weight: bold; }
-        .qr-area { text-align: center; margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 10px; border: 1px dashed #ccc; }
+        th, td { border-bottom: 1px solid var(--border); padding: 12px 8px; text-align: left; }
+        .badge { padding: 3px 8px; border-radius: 5px; font-size: 0.8em; color: white; }
+        .theme-toggle { margin-bottom: 10px; align-self: flex-end; cursor: pointer; font-size: 1.2em; }
     </style>
 </head>
-<body>
+<body data-theme="light">
+
+<div class="theme-toggle" onclick="toggleTheme()">🌓 Mode</div>
 
 <div class="container">
     <div class="tabs">
         <button class="tab-btn active" onclick="openTab('tab-absen')">Absensi</button>
-        <button class="tab-btn" onclick="openTab('tab-admin')">Daftar Pegawai</button>
+        <button class="tab-btn" onclick="openTab('tab-admin')">Pegawai</button>
     </div>
 
     <div id="tab-absen" class="content active">
         <div id="statusLokasi" class="status-lokasi bahaya">Mengecek GPS...</div>
         <div id="reader"></div>
-        <div id="infoScan" style="text-align: center; margin-bottom: 15px; font-weight: bold;">Silakan Scan QR Code Pegawai</div>
-        
+        <div id="infoScan" style="text-align: center; margin-bottom: 15px; font-weight: bold;">Scan QR Pegawai</div>
         <div style="display: flex; gap: 10px;">
             <button id="btnIn" class="btn-green" style="flex:1" onclick="prosesAbsen('Masuk')" disabled>Check In</button>
             <button id="btnOut" class="btn-red" style="flex:1" onclick="prosesAbsen('Pulang')" disabled>Check Out</button>
         </div>
-        
         <div style="margin-top: 25px; display: flex; justify-content: space-between; align-items: center;">
-            <h4 style="margin: 0;">Riwayat Hari Ini</h4>
-            <button onclick="exportLogAbsen()" style="background:#27ae60; font-size:0.7em; padding:5px 10px;">💾 Download Excel</button>
+            <h4 style="margin:0">Log Hari Ini</h4>
+            <button onclick="exportLogAbsen()" style="background:#27ae60; font-size:0.7em; padding:5px 10px;">💾 Excel</button>
         </div>
         <table>
-            <thead>
-                <tr><th>Nama</th><th>Tipe</th><th>Jam</th><th>Ket</th></tr>
-            </thead>
-            <tbody id="logAbsen">
-                <tr><td colspan="4" style="text-align:center">Memuat data...</td></tr>
-            </tbody>
+            <thead><tr><th>Nama</th><th>Tipe</th><th>Jam</th><th>Ket</th></tr></thead>
+            <tbody id="logAbsen"></tbody>
         </table>
     </div>
 
     <div id="tab-admin" class="content">
         <h3>Pendaftaran Pegawai</h3>
-        <input type="text" id="regNama" placeholder="Ketik Nama Lengkap Pegawai...">
-        <button class="btn-blue" onclick="simpanPegawai()">Daftarkan ke Cloud</button>
-        
-        <div id="qrPrint" class="qr-area" style="display: none;">
-            <div id="qrcode" style="display: flex; justify-content: center;"></div>
-            <p id="qrLabel" style="font-weight: bold; margin-top: 10px;"></p>
-            <button class="btn-blue" style="width: auto; background: #95a5a6;" onclick="window.print()">Cetak QR</button>
+        <input type="text" id="regNama" placeholder="Nama Pegawai...">
+        <button class="btn-blue" onclick="simpanPegawai()">Simpan ke Cloud</button>
+        <div id="qrPrint" style="display:none; text-align:center; margin-top:15px; padding:10px; border:1px dashed #ccc;">
+            <div id="qrcode" style="display:flex; justify-content:center"></div>
+            <p id="qrLabel" style="font-weight:bold"></p>
         </div>
-
-        <div style="margin-top: 30px; border-top: 2px solid #eee; padding-top: 15px;">
-            <h4>List Pegawai (Cloud)</h4>
-            <table>
-                <thead><tr><th>Nama</th><th>Aksi</th></tr></thead>
-                <tbody id="listPegawai"></tbody>
-            </table>
-        </div>
+        <h4 style="margin-top:20px">Daftar Pegawai</h4>
+        <tbody id="listPegawai"></tbody>
+        <table id="tablePegawai"><thead><tr><th>Nama</th><th>Aksi</th></tr></thead><tbody id="listPegawai"></tbody></table>
     </div>
 </div>
 
 <script>
-    // ======= 1. FIREBASE CONFIG (DARI GAMBAR ANDA) =======
     const firebaseConfig = {
         apiKey: "AIzaSyCMu-Bfd1GQWIoT1CnInPtWcIDCJkhSIgQ",
         authDomain: "absensi-kantor-cf8b7.firebaseapp.com",
@@ -98,17 +92,31 @@
         appId: "1:287648038826:web:15c9e546d66162980f75d3"
     };
 
-    // ======= 2. SETTING KANTOR & ATURAN =======
     const LAT_KANTOR = -7.716884146853014; 
     const LON_KANTOR = 112.0677810812019; 
-    const RAD_MAKS = 100; // Meter
-    const JAM_MASUK_MAKS = "08:00";
+    const RAD_MAKS = 100;
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     let lokasiOk = false;
     let namaTerdeteksi = "";
     let dataMasukHariIni = null;
+
+    // FITUR DARK MODE
+    function toggleTheme() {
+        const body = document.body;
+        const current = body.getAttribute('data-theme');
+        body.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+    }
+
+    // FITUR NOTIFIKASI SUARA
+    function bicara(teks) {
+        const speech = new SpeechSynthesisUtterance();
+        speech.text = teks;
+        speech.lang = 'id-ID';
+        speech.rate = 1;
+        window.speechSynthesis.speak(speech);
+    }
 
     function openTab(id) {
         document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
@@ -117,174 +125,114 @@
         event.currentTarget.classList.add('active');
     }
 
-    // LOGIKA SCAN QR
     function onScanSuccess(decodedText) {
         const nama = decodedText.trim();
         db.ref('pegawai').once('value', (snap) => {
-            let userFound = false;
-            snap.forEach(child => {
-                if(child.val().nama.toLowerCase() === nama.toLowerCase()) userFound = true;
-            });
-
-            if(userFound) {
+            let found = false;
+            snap.forEach(c => { if(c.val().nama.toLowerCase() === nama.toLowerCase()) found = true; });
+            if(found) {
                 namaTerdeteksi = nama;
-                document.getElementById('infoScan').innerHTML = `Terdeteksi: <span style="color:green">${nama}</span>`;
-                checkLimitHarian(nama);
+                document.getElementById('infoScan').innerHTML = `Terdeteksi: <span style="color:#2ecc71">${nama}</span>`;
+                checkStatus(nama);
             } else {
-                document.getElementById('infoScan').innerHTML = `<span style="color:red">QR "${nama}" Tidak Terdaftar!</span>`;
-                resetTombol();
+                document.getElementById('infoScan').innerHTML = `<span style="color:#e74c3c">QR Tidak Terdaftar</span>`;
             }
         });
     }
 
-    function checkLimitHarian(nama) {
-        const tglHariIni = new Date().toLocaleDateString('id-ID');
+    function checkStatus(nama) {
+        const tgl = new Date().toLocaleDateString('id-ID');
         db.ref('log_absen').once('value', (snap) => {
-            let sdhMasuk = false;
-            let sdhPulang = false;
+            let sdhIn = false; let sdhOut = false;
             dataMasukHariIni = null;
-
-            snap.forEach(child => {
-                const log = child.val();
-                if(log.nama === nama && new Date(log.ts).toLocaleDateString('id-ID') === tglHariIni) {
-                    if(log.tipe === 'Masuk') { sdhMasuk = true; dataMasukHariIni = log; }
-                    if(log.tipe === 'Pulang') sdhPulang = true;
+            snap.forEach(c => {
+                const log = c.val();
+                if(log.nama === nama && new Date(log.ts).toLocaleDateString('id-ID') === tgl) {
+                    if(log.tipe === 'Masuk') { sdhIn = true; dataMasukHariIni = log; }
+                    if(log.tipe === 'Pulang') sdhOut = true;
                 }
             });
-
-            const bIn = document.getElementById('btnIn');
-            const bOut = document.getElementById('btnOut');
-
-            bIn.disabled = (sdhMasuk || !lokasiOk);
-            bIn.innerText = sdhMasuk ? "Sudah Masuk" : "Check In";
-
-            bOut.disabled = (sdhPulang || !lokasiOk || !sdhMasuk);
-            bOut.innerText = sdhPulang ? "Sudah Pulang" : "Check Out";
+            document.getElementById('btnIn').disabled = (sdhIn || !lokasiOk);
+            document.getElementById('btnOut').disabled = (sdhOut || !lokasiOk || !sdhIn);
         });
-    }
-
-    function resetTombol() {
-        document.getElementById('btnIn').disabled = true;
-        document.getElementById('btnOut').disabled = true;
     }
 
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render(onScanSuccess);
 
-    // PROSES SIMPAN KE FIREBASE
     function prosesAbsen(tipe) {
         const skrg = new Date();
-        const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
-        let status = "-";
+        const jam = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+        let status = tipe === 'Masuk' ? (jam > "08:00" ? "Terlambat" : "Tepat Waktu") : "-";
         let durasi = "-";
 
-        if(tipe === 'Masuk') {
-            status = (jamStr > JAM_MASUK_MAKS) ? "Terlambat" : "Tepat Waktu";
-        } else if(tipe === 'Pulang' && dataMasukHariIni) {
+        if(tipe === 'Pulang' && dataMasukHariIni) {
             const diff = skrg.getTime() - dataMasukHariIni.ts;
-            const jam = Math.floor(diff / 3600000);
-            const menit = Math.floor((diff % 3600000) / 60000);
-            durasi = `${jam}j ${menit}m`;
+            durasi = `${Math.floor(diff/3600000)}j ${Math.floor((diff%3600000)/60000)}m`;
         }
 
         db.ref('log_absen').push({
-            nama: namaTerdeteksi,
-            tipe: tipe,
-            waktu: jamStr,
-            ts: firebase.database.ServerValue.TIMESTAMP,
-            status: status,
-            durasi: durasi
+            nama: namaTerdeteksi, tipe, waktu: jam, ts: firebase.database.ServerValue.TIMESTAMP, status, durasi
         }).then(() => {
-            alert(`Absen ${tipe} Berhasil!`);
-            location.reload();
+            bicara(`Terima kasih ${namaTerdeteksi}, absen ${tipe} berhasil!`);
+            setTimeout(() => location.reload(), 2000);
         });
     }
 
-    // UPDATE LOG REALTIME (PERBAIKAN KOLOM KETERANGAN)
     db.ref('log_absen').on('value', (snap) => {
-        let html = "";
-        let dataArray = [];
-        snap.forEach(child => { dataArray.push(child.val()); });
-
-        dataArray.reverse().slice(0, 15).forEach(i => {
-            let labelKet = "";
-            if(i.tipe === 'Masuk') {
-                const warna = i.status === 'Terlambat' ? '#e74c3c' : '#27ae60';
-                labelKet = `<span class="badge" style="background:${warna}">${i.status || 'Hadir'}</span>`;
-            } else {
-                labelKet = `<small style="color:#636e72; font-weight:bold">${i.durasi || '-'}</small>`;
-            }
-
-            html += `<tr>
-                <td><strong>${i.nama}</strong></td>
-                <td>${i.tipe}</td>
-                <td>${i.waktu}</td>
-                <td>${labelKet}</td>
-            </tr>`;
+        let html = ""; let arr = [];
+        snap.forEach(c => arr.push(c.val()));
+        arr.reverse().slice(0, 10).forEach(i => {
+            const color = i.status === 'Terlambat' ? '#e74c3c' : '#2ecc71';
+            const ket = i.tipe === 'Masuk' ? `<span class="badge" style="background:${color}">${i.status}</span>` : `<small>${i.durasi}</small>`;
+            html += `<tr><td>${i.nama}</td><td>${i.tipe}</td><td>${i.waktu}</td><td>${ket}</td></tr>`;
         });
-        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4' style='text-align:center'>Belum ada log</td></tr>";
+        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4'>Belum ada data</td></tr>";
     });
-
-    // ADMIN: SIMPAN PEGAWAI
-    function simpanPegawai() {
-        const nama = document.getElementById('regNama').value.trim();
-        if(!nama) return alert("Isi nama dulu!");
-        db.ref('pegawai').push({ nama: nama }).then(() => {
-            document.getElementById('qrcode').innerHTML = "";
-            new QRCode(document.getElementById('qrcode'), { text: nama, width: 160, height: 160 });
-            document.getElementById('qrLabel').innerText = nama;
-            document.getElementById('qrPrint').style.display = "block";
-            document.getElementById('regNama').value = "";
-        });
-    }
 
     db.ref('pegawai').on('value', (snap) => {
-        let html = "";
+        let h = "";
         snap.forEach(c => {
-            html += `<tr><td>${c.val().nama}</td><td><button class="btn-red" style="padding:5px 10px" onclick="hapusPegawai('${c.key}')">Hapus</button></td></tr>`;
+            h += `<tr><td>${c.val().nama}</td><td><button class="btn-red" style="padding:5px" onclick="hapusPegawai('${c.key}')">Hapus</button></td></tr>`;
         });
-        document.getElementById('listPegawai').innerHTML = html;
+        document.getElementById('listPegawai').innerHTML = h;
     });
 
-    function hapusPegawai(key) { if(confirm("Hapus pegawai?")) db.ref('pegawai/' + key).remove(); }
-
-    // EXPORT EXCEL
-    function exportLogAbsen() {
-        db.ref('log_absen').once('value', s => {
-            const list = [];
-            s.forEach(c => {
-                const d = c.val();
-                list.push({
-                    Tanggal: new Date(d.ts).toLocaleDateString('id-ID'),
-                    Nama: d.nama,
-                    Tipe: d.tipe,
-                    Jam: d.waktu,
-                    Status: d.status,
-                    Durasi_Kerja: d.durasi
-                });
-            });
-            const ws = XLSX.utils.json_to_sheet(list);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Laporan");
-            XLSX.writeFile(wb, `Absensi_${new Date().toLocaleDateString()}.xlsx`);
+    function simpanPegawai() {
+        const n = document.getElementById('regNama').value.trim();
+        if(n) db.ref('pegawai').push({ nama: n }).then(() => {
+            document.getElementById('qrcode').innerHTML = "";
+            new QRCode(document.getElementById('qrcode'), { text: n, width: 150, height: 150 });
+            document.getElementById('qrLabel').innerText = n;
+            document.getElementById('qrPrint').style.display = "block";
         });
     }
 
-    // GEOLOCATION
-    navigator.geolocation.watchPosition(pos => {
-        const dist = hitungJarak(pos.coords.latitude, pos.coords.longitude, LAT_KANTOR, LON_KANTOR);
-        lokasiOk = dist <= RAD_MAKS;
+    function hapusPegawai(k) { if(confirm("Hapus?")) db.ref('pegawai/' + k).remove(); }
+
+    function exportLogAbsen() {
+        db.ref('log_absen').once('value', s => {
+            const d = [];
+            s.forEach(c => {
+                const i = c.val();
+                d.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Status: i.status, Jam_Kerja: i.durasi });
+            });
+            const ws = XLSX.utils.json_to_sheet(d); const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Rekap"); XLSX.writeFile(wb, "Laporan_Absensi.xlsx");
+        });
+    }
+
+    navigator.geolocation.watchPosition(p => {
+        const d = hitungJarak(p.coords.latitude, p.coords.longitude, LAT_KANTOR, LON_KANTOR);
+        lokasiOk = d <= RAD_MAKS;
         const el = document.getElementById('statusLokasi');
-        el.innerText = `${lokasiOk ? 'Lokasi OK' : 'Diluar Area'} (${Math.round(dist)}m)`;
+        el.innerText = `${lokasiOk ? 'Lokasi OK' : 'Diluar Area'} (${Math.round(d)}m)`;
         el.className = `status-lokasi ${lokasiOk ? 'aman' : 'bahaya'}`;
-    }, err => {
-        document.getElementById('statusLokasi').innerText = "GPS tidak aktif / diblokir";
-    }, { enableHighAccuracy: true });
+    }, null, { enableHighAccuracy: true });
 
     function hitungJarak(lat1, lon1, lat2, lon2) {
         const R = 6371000;
-        const dLat = (lat2-lat1)*Math.PI/180;
-        const dLon = (lon2-lon1)*Math.PI/180;
+        const dLat = (lat2-lat1)*Math.PI/180; const dLon = (lon2-lon1)*Math.PI/180;
         const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
