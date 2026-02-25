@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Final Fix</title>
+    <title>Absensi Pro - Final</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -23,7 +23,7 @@
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
         .btn-action { padding: 6px 12px; border-radius: 6px; border: none; color: white; font-weight: bold; font-size: 0.75em; cursor: pointer; margin-right: 4px; }
         .btn-edit { background: #f1c40f; } .btn-hapus { background: #e74c3c; } .btn-qr { background: #2ecc71; }
-        .btn-excel { background: #27ae60; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.8em; border: none; cursor: pointer; }
+        .btn-excel { background: #27ae60; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 5px; }
         input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
         .btn-primary { background: #3498db; color: white; width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .badge { padding: 4px 8px; border-radius: 5px; font-size: 0.75em; color: white; font-weight: bold; }
@@ -44,7 +44,12 @@
             <button id="btnIn" style="flex:1; background:#2ecc71; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold;" onclick="prosesAbsen('Masuk')" disabled>Check In</button>
             <button id="btnOut" style="flex:1; background:#e74c3c; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold;" onclick="prosesAbsen('Pulang')" disabled>Check Out</button>
         </div>
-        <h4>Log Hari Ini</h4>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="margin:0">Log Hari Ini</h4>
+            <button class="btn-excel" onclick="exportExcelAbsensi()">📊 Laporan Absen</button>
+        </div>
+        
         <table>
             <thead><tr><th>Nama</th><th>Tipe</th><th>Jam</th><th>Ket</th></tr></thead>
             <tbody id="logAbsen"></tbody>
@@ -64,7 +69,7 @@
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px;">
             <h4 style="margin:0">Daftar Pegawai</h4>
-            <button class="btn-excel" onclick="exportExcel()">📊 Export Excel</button>
+            <button class="btn-excel" onclick="exportExcelPegawai()">💾 Export Excel</button>
         </div>
         <table>
             <thead><tr><th>Nama Pegawai</th><th>Aksi</th></tr></thead>
@@ -101,7 +106,7 @@
         document.getElementById(id === 'tab-absen' ? 'tabAbsenBtn' : 'tabPegawaiBtn').classList.add('active');
     }
 
-    // FIX: RIWAYAT ABSENSI MUNCUL DENGAN BENAR
+    // Tampilkan Log Hari Ini
     db.ref('log_absen').on('value', (snap) => {
         let html = ""; let arr = [];
         const tglHariIni = new Date().toLocaleDateString('id-ID');
@@ -118,7 +123,7 @@
         document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4' style='text-align:center'>Belum ada absensi hari ini</td></tr>";
     });
 
-    // FIX: FITUR ABSEN SEKALI SEHARI
+    // Fitur Absen Sekali Sehari
     function checkStatusAbsen(nama) {
         const tglHariIni = new Date().toLocaleDateString('id-ID');
         db.ref('log_absen').once('value', (snap) => {
@@ -135,12 +140,11 @@
             document.getElementById('btnOut').disabled = (!sdhMasuk || sdhPulang);
             
             if(sdhMasuk && sdhPulang) {
-                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sdh Absen Lengkap)</span>`;
+                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sudah Absen Hari Ini)</span>`;
             }
         });
     }
 
-    // FUNGSI PROSES ABSEN
     function prosesAbsen(tipe) {
         const skrg = new Date();
         const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -149,12 +153,11 @@
         db.ref('log_absen').push({
             nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, status: status, ts: Date.now()
         }).then(() => {
-            bicara(`Absen ${tipe} ${namaTerdeteksi} berhasil.`);
+            bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
             alert(`Absen ${tipe} Berhasil!`);
         });
     }
 
-    // SCANNER
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render((txt) => {
         namaTerdeteksi = txt;
@@ -162,7 +165,34 @@
         checkStatusAbsen(txt);
     });
 
-    // MENU DAFTAR PEGAWAI (TIDAK BERUBAH)
+    // EXPORT 1: LAPORAN ABSENSI (LOG)
+    function exportExcelAbsensi() {
+        db.ref('log_absen').once('value', (snap) => {
+            let data = [];
+            snap.forEach(c => {
+                const i = c.val();
+                data.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Keterangan: i.status });
+            });
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Riwayat Absensi");
+            XLSX.writeFile(wb, "Laporan_Absensi.xlsx");
+        });
+    }
+
+    // EXPORT 2: KHUSUS DAFTAR PEGAWAI TERDAFTAR
+    function exportExcelPegawai() {
+        db.ref('pegawai').once('value', (snap) => {
+            let data = [];
+            snap.forEach(c => data.push({ "Nama Pegawai": c.val().nama }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
+            XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
+        });
+    }
+
+    // MENU PEGAWAI (Edit, Hapus, QR tetap di sini)
     db.ref('pegawai').on('value', (snap) => {
         let html = "";
         snap.forEach(c => {
@@ -190,16 +220,6 @@
         document.getElementById('qrcode').innerHTML = "";
         new QRCode(document.getElementById('qrcode'), { text: n, width: 120, height: 120 });
         document.getElementById('qrLabel').innerText = n;
-    }
-    function exportExcel() {
-        db.ref('log_absen').once('value', (snap) => {
-            let data = []; snap.forEach(c => {
-                const i = c.val();
-                data.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Ket: i.status });
-            });
-            const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Rekap"); XLSX.writeFile(wb, "Laporan_Absen.xlsx");
-        });
     }
 </script>
 </body>
