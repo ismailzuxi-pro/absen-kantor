@@ -124,13 +124,9 @@
     });
 
     // Fitur Absen Sekali Sehari
-// REVISI FITUR ABSEN SEKALI SEHARI & PESAN SUARA
+// 1. Fungsi Cek Status (Hanya update tombol, TANPA pesan suara)
 function checkStatusAbsen(nama) {
     const tglHariIni = new Date().toLocaleDateString('id-ID');
-    
-    // Tampilkan loading sebentar agar user tidak klik buru-buru
-    document.getElementById('infoScan').innerHTML = `Mengecek status ${nama}...`;
-
     db.ref('log_absen').once('value', (snap) => {
         let sdhMasuk = false; 
         let sdhPulang = false;
@@ -144,17 +140,15 @@ function checkStatusAbsen(nama) {
             }
         });
 
-        // Simpan ke memori browser
+        // Simpan status ke memori untuk dibaca saat tombol diklik
         window.cekAbsen = { masuk: sdhMasuk, pulang: sdhPulang };
 
-        // Update visual tombol
+        // Aktifkan/Nonaktifkan tombol secara visual
         document.getElementById('btnIn').disabled = sdhMasuk;
         document.getElementById('btnOut').disabled = (!sdhMasuk || sdhPulang);
         
         if(sdhMasuk && sdhPulang) {
-            document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sudah Lengkap)</span>`;
-            // Trigger suara otomatis saat scan jika sudah lengkap keduanya
-            bicara(`Maaf ${nama}, Anda sudah absen masuk dan pulang hari ini.`);
+            document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sdh Absen Lengkap)</span>`;
         } else {
             document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${nama}</span>`;
         }
@@ -162,21 +156,36 @@ function checkStatusAbsen(nama) {
 }
 
 function prosesAbsen(tipe) {
-    // Pastikan variabel cekAbsen ada
+    // Pastikan variabel cekAbsen tersedia
     if (!window.cekAbsen) window.cekAbsen = { masuk: false, pulang: false };
 
-    // Validasi Suara Peringatan
+    // --- LOGIKA PESAN SUARA SPESIFIK SAAT TOMBOL DIKLIK ---
+    
+    // Jika klik "Check In" tapi di data sudah ada "Masuk"
     if (tipe === "Masuk" && window.cekAbsen.masuk) {
-        bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk hari ini.`);
-        alert(`Anda sudah absen masuk hari ini!`); // Tambah alert agar browser "bangun"
-        return;
+        if (!window.cekAbsen.pulang) {
+            // Kondisi: Sudah masuk, tapi belum pulang
+            bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk. Silakan absen pulang nanti saat jam pulang.`);
+        } else {
+            // Kondisi: Sudah masuk dan sudah pulang (sudah lengkap)
+            bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk dan pulang hari ini.`);
+        }
+        return; 
     }
+
+    // Jika klik "Check Out" tapi sudah ada data "Pulang"
     if (tipe === "Pulang" && window.cekAbsen.pulang) {
         bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang hari ini.`);
-        alert(`Anda sudah absen pulang hari ini!`);
+        return; 
+    }
+    
+    // Tambahan: Jika klik "Check Out" tapi BELUM "Check In"
+    if (tipe === "Pulang" && !window.cekAbsen.masuk) {
+        bicara(`Maaf ${namaTerdeteksi}, Anda belum absen masuk. Silakan absen masuk terlebih dahulu.`);
         return;
     }
 
+    // --- PROSES SIMPAN DATA (Jika lolos validasi di atas) ---
     const skrg = new Date();
     const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
     let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
@@ -188,8 +197,11 @@ function prosesAbsen(tipe) {
         status: status, 
         ts: Date.now()
     }).then(() => {
+        // Suara Berhasil
         bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
         alert(`Absen ${tipe} Berhasil!`);
+        
+        // Refresh status tombol
         checkStatusAbsen(namaTerdeteksi);
     });
 }
