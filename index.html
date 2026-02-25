@@ -182,13 +182,27 @@
 
     // EXPORT 2: KHUSUS DAFTAR PEGAWAI TERDAFTAR
     function exportExcelPegawai() {
-        db.ref('pegawai').once('value', (snap) => {
-            let data = [];
-            snap.forEach(c => data.push({ "Nama Pegawai": c.val().nama }));
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
-            XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
+    db.ref('pegawai').once('value', (snap) => {
+        let data = [];
+        // Pastikan melakukan perulangan pada setiap anak (child) di database pegawai
+        snap.forEach(childSnap => {
+            const i = childSnap.val();
+            if (i.nama) {
+                data.push({ "Nama Pegawai": i.nama });
+            }
+        });
+
+        if (data.length === 0) {
+            alert("Tidak ada data pegawai untuk diekspor.");
+            return;
+        }
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
+        
+        // Menghasilkan file Excel dengan nama Daftar_Pegawai.xlsx
+        XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
         });
     }
 
