@@ -124,39 +124,62 @@
     });
 
     // Fitur Absen Sekali Sehari
-    function checkStatusAbsen(nama) {
-        const tglHariIni = new Date().toLocaleDateString('id-ID');
-        db.ref('log_absen').once('value', (snap) => {
-            let sdhMasuk = false; let sdhPulang = false;
-            snap.forEach(c => {
-                const log = c.val();
-                const tglLog = new Date(log.ts).toLocaleDateString('id-ID');
-                if(log.nama === nama && tglLog === tglHariIni) {
-                    if(log.tipe === "Masuk") sdhMasuk = true;
-                    if(log.tipe === "Pulang") sdhPulang = true;
-                }
-            });
-            document.getElementById('btnIn').disabled = sdhMasuk;
-            document.getElementById('btnOut').disabled = (!sdhMasuk || sdhPulang);
-            
-            if(sdhMasuk && sdhPulang) {
-                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sudah Absen Hari Ini)</span>`;
+// FIX: FITUR ABSEN SEKALI SEHARI DENGAN PESAN SUARA SPESIFIK
+function checkStatusAbsen(nama) {
+    const tglHariIni = new Date().toLocaleDateString('id-ID');
+    db.ref('log_absen').once('value', (snap) => {
+        let sdhMasuk = false; 
+        let sdhPulang = false;
+
+        snap.forEach(c => {
+            const log = c.val();
+            const tglLog = new Date(log.ts).toLocaleDateString('id-ID');
+            if(log.nama === nama && tglLog === tglHariIni) {
+                if(log.tipe === "Masuk") sdhMasuk = true;
+                if(log.tipe === "Pulang") sdhPulang = true;
             }
         });
+
+        // Simpan status ke dalam variabel global agar bisa dicek saat tombol diklik
+        window.statusSekarang = { masuk: sdhMasuk, pulang: sdhPulang };
+
+        document.getElementById('btnIn').disabled = sdhMasuk;
+        document.getElementById('btnOut').disabled = (!sdhMasuk || sdhPulang);
+        
+        if(sdhMasuk && sdhPulang) {
+            document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sudah Selesai)</span>`;
+        }
+    });
+}
+
+function prosesAbsen(tipe) {
+    // Tambahan Logika Peringatan Suara jika memaksa klik
+    if (tipe === "Masuk" && window.statusSekarang.masuk) {
+        bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk hari ini.`);
+        return;
+    }
+    if (tipe === "Pulang" && window.statusSekarang.pulang) {
+        bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang hari ini.`);
+        return;
     }
 
-    function prosesAbsen(tipe) {
-        const skrg = new Date();
-        const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
-        let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
+    const skrg = new Date();
+    const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+    let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
 
-        db.ref('log_absen').push({
-            nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, status: status, ts: Date.now()
-        }).then(() => {
-            bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
-            alert(`Absen ${tipe} Berhasil!`);
-        });
-    }
+    db.ref('log_absen').push({
+        nama: namaTerdeteksi, 
+        tipe: tipe, 
+        waktu: jamStr, 
+        status: status, 
+        ts: Date.now()
+    }).then(() => {
+        bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
+        alert(`Absen ${tipe} Berhasil!`);
+        // Reset status setelah berhasil
+        checkStatusAbsen(namaTerdeteksi);
+    });
+}
 
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render((txt) => {
