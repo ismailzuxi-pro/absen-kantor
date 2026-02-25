@@ -124,9 +124,13 @@
     });
 
     // Fitur Absen Sekali Sehari
-// GANTI FUNGSI INI
+// REVISI FITUR ABSEN SEKALI SEHARI & PESAN SUARA
 function checkStatusAbsen(nama) {
     const tglHariIni = new Date().toLocaleDateString('id-ID');
+    
+    // Tampilkan loading sebentar agar user tidak klik buru-buru
+    document.getElementById('infoScan').innerHTML = `Mengecek status ${nama}...`;
+
     db.ref('log_absen').once('value', (snap) => {
         let sdhMasuk = false; 
         let sdhPulang = false;
@@ -140,32 +144,39 @@ function checkStatusAbsen(nama) {
             }
         });
 
-        // KUNCI: Menyimpan status ke memori browser untuk pengecekan suara
+        // Simpan ke memori browser
         window.cekAbsen = { masuk: sdhMasuk, pulang: sdhPulang };
 
-        // Update tombol (Visual)
+        // Update visual tombol
         document.getElementById('btnIn').disabled = sdhMasuk;
         document.getElementById('btnOut').disabled = (!sdhMasuk || sdhPulang);
         
         if(sdhMasuk && sdhPulang) {
             document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Sudah Lengkap)</span>`;
+            // Trigger suara otomatis saat scan jika sudah lengkap keduanya
+            bicara(`Maaf ${nama}, Anda sudah absen masuk dan pulang hari ini.`);
+        } else {
+            document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${nama}</span>`;
         }
     });
 }
 
-// DAN GANTI FUNGSI INI
 function prosesAbsen(tipe) {
-    // 1. Cek jika sudah pernah klik sebelumnya (Pesan Suara Peringatan)
+    // Pastikan variabel cekAbsen ada
+    if (!window.cekAbsen) window.cekAbsen = { masuk: false, pulang: false };
+
+    // Validasi Suara Peringatan
     if (tipe === "Masuk" && window.cekAbsen.masuk) {
         bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk hari ini.`);
-        return; // Berhenti, tidak simpan data
+        alert(`Anda sudah absen masuk hari ini!`); // Tambah alert agar browser "bangun"
+        return;
     }
     if (tipe === "Pulang" && window.cekAbsen.pulang) {
         bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang hari ini.`);
-        return; // Berhenti, tidak simpan data
+        alert(`Anda sudah absen pulang hari ini!`);
+        return;
     }
 
-    // 2. Jika lolos cek, jalankan proses simpan
     const skrg = new Date();
     const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
     let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
@@ -177,14 +188,9 @@ function prosesAbsen(tipe) {
         status: status, 
         ts: Date.now()
     }).then(() => {
-        // Suara Berhasil
         bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
         alert(`Absen ${tipe} Berhasil!`);
-        
-        // Refresh status setelah berhasil simpan agar tombol langsung terkunci
         checkStatusAbsen(namaTerdeteksi);
-    }).catch((error) => {
-        console.error("Gagal simpan:", error);
     });
 }
 
