@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Suara Aktif</title>
+    <title>Absensi Pro - Suara & Radius 100m</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -28,11 +28,15 @@
         .btn-primary { background: #3498db; color: white; width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .badge { padding: 4px 8px; border-radius: 5px; font-size: 0.75em; color: white; font-weight: bold; }
         
-        /* Style baru untuk tombol absen */
         .btn-absen { flex:1; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; color:white; transition: 0.3s; }
         .btn-absen.masuk { background:#2ecc71; }
         .btn-absen.pulang { background:#e74c3c; }
         .btn-absen.locked { background:#bdc3c7; cursor:not-allowed; opacity: 0.8; }
+
+        /* Style untuk info jarak */
+        #statusJarak { text-align: center; font-size: 0.9em; margin-bottom: 10px; font-weight: bold; padding: 5px; border-radius: 5px; }
+        .di-luar { background: #ffeaa7; color: #d63031; }
+        .di-dalam { background: #55efc4; color: #00b894; }
     </style>
 </head>
 <body>
@@ -45,6 +49,7 @@
 
     <div id="tab-absen" class="content active">
         <div id="reader"></div>
+        <div id="statusJarak">Mendeteksi Lokasi...</div>
         <div id="infoScan" style="text-align:center; font-weight:bold; margin-bottom:15px;">Scan QR Pegawai</div>
         <div style="display:flex; gap:10px; margin-bottom:20px;">
             <button id="btnIn" class="btn-absen masuk" onclick="prosesAbsen('Masuk')">Check In</button>
@@ -97,14 +102,60 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    
+    // --- PENGATURAN RADIUS KANTOR ---
+    const LAT_KANTOR = -7.716846501344563; // <--- GANTI dengan Latitude kantor Anda
+    const LON_KANTOR = 112.06776955014226; // <--- GANTI dengan Longitude kantor Anda
+    const MAX_JARAK = 100; // Jarak maksimal dalam meter
+    
     let namaTerdeteksi = "";
+    let jarakSekarang = 9999;
     window.cekAbsen = { masuk: false, pulang: false };
 
     function bicara(teks) {
-        window.speechSynthesis.cancel(); // Hentikan suara sebelumnya agar tidak tumpang tindih
+        window.speechSynthesis.cancel();
         const msg = new SpeechSynthesisUtterance(teks);
         msg.lang = 'id-ID';
         window.speechSynthesis.speak(msg);
+    }
+
+    // Fungsi Hitung Jarak (Haversine Formula)
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; // Radius bumi dalam meter
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lon2-lon1) * Math.PI/180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+        return R * c; 
+    }
+
+    // Pantau Lokasi Pegawai
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition((position) => {
+            jarakSekarang = getDistance(
+                position.coords.latitude, 
+                position.coords.longitude, 
+                LAT_KANTOR, 
+                LON_KANTOR
+            );
+            
+            const elStatus = document.getElementById('statusJarak');
+            if (jarakSekarang <= MAX_JARAK) {
+                elStatus.innerHTML = `✅ Anda berada di radius kantor (${Math.round(jarakSekarang)}m)`;
+                elStatus.className = "di-dalam";
+            } else {
+                elStatus.innerHTML = `⚠️ Di luar jangkauan (${Math.round(jarakSekarang)}m)`;
+                elStatus.className = "di-luar";
+            }
+        }, (err) => {
+            document.getElementById('statusJarak').innerHTML = "❌ GPS tidak aktif/izin ditolak";
+        }, { enableHighAccuracy: true });
     }
 
     function openTab(id) {
@@ -114,7 +165,6 @@
         document.getElementById(id === 'tab-absen' ? 'tabAbsenBtn' : 'tabPegawaiBtn').classList.add('active');
     }
 
-    // Tampilkan Log Hari Ini
     db.ref('log_absen').on('value', (snap) => {
         let html = ""; let arr = [];
         const tglHariIni = new Date().toLocaleDateString('id-ID');
@@ -147,19 +197,13 @@
             });
 
             window.cekAbsen = { masuk: sdhMasuk, pulang: sdhPulang };
-
-            // Update visual tombol tanpa menonaktifkan klik
             const btnIn = document.getElementById('btnIn');
             const btnOut = document.getElementById('btnOut');
 
             if(sdhMasuk) btnIn.classList.add('locked'); else btnIn.classList.remove('locked');
             if(!sdhMasuk || sdhPulang) btnOut.classList.add('locked'); else btnOut.classList.remove('locked');
             
-            if(sdhMasuk && sdhPulang) {
-                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#e74c3c">${nama} (Lengkap)</span>`;
-            } else {
-                document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${nama}</span>`;
-            }
+            document.getElementById('infoScan').innerHTML = `Pegawai: <span style="color:#3498db">${nama}</span>`;
         });
     }
 
@@ -169,7 +213,13 @@
             return;
         }
 
-        // --- LOGIKA SUARA PERINGATAN ---
+        // --- VALIDASI JARAK 100 METER ---
+        if (jarakSekarang > MAX_JARAK) {
+            bicara(`Maaf ${namaTerdeteksi}, Anda berada di luar jangkauan, mohon mendekat ke kantor.`);
+            alert(`Gagal! Anda berada di luar radius kantor (${Math.round(jarakSekarang)}m)`);
+            return;
+        }
+
         if (tipe === "Masuk" && window.cekAbsen.masuk) {
             if (!window.cekAbsen.pulang) {
                 bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk. Silakan absen pulang nanti.`);
@@ -190,7 +240,6 @@
             }
         }
 
-        // --- JIKA LOLOS VALIDASI, PROSES ABSEN ---
         const skrg = new Date();
         const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
         let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
@@ -214,6 +263,7 @@
         checkStatusAbsen(txt);
     });
 
+    // Fungsi Admin (Export, Simpan, Edit, Hapus)
     function exportExcelAbsensi() {
         db.ref('log_absen').once('value', (snap) => {
             let data = [];
