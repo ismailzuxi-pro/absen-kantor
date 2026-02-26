@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Absensi Pro - Modern UI & Fixed Lokasi</title>
+    <title>Absensi Pro - Fix Double Pulang</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -11,170 +11,33 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         :root { 
-            --primary: #4361ee; 
-            --success: #2ecc71; 
-            --danger: #ef233c; 
-            --warning: #fbc02d;
-            --bg: #f8f9fa; 
-            --card: #ffffff; 
-            --text-main: #2b2d42;
-            --text-muted: #8d99ae;
+            --primary: #4361ee; --success: #2ecc71; --danger: #ef233c; 
+            --bg: #f8f9fa; --card: #ffffff; --text-main: #2b2d42; --text-muted: #8d99ae;
         }
-
-        body { 
-            font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; 
-            background: var(--bg); 
-            color: var(--text-main); 
-            margin: 0; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-        }
-
-        .container { 
-            width: 100%; 
-            max-width: 500px; 
-            background: var(--card); 
-            border-radius: 24px; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.05); 
-            overflow: hidden; 
-            border: 1px solid rgba(0,0,0,0.03);
-        }
-
-        .tabs { 
-            display: flex; 
-            background: #f1f3f5; 
-            padding: 8px;
-            margin: 15px;
-            border-radius: 16px;
-        }
-
-        .tab-btn { 
-            flex: 1; 
-            padding: 12px; 
-            border: none; 
-            cursor: pointer; 
-            font-weight: 600; 
-            color: var(--text-muted); 
-            background: transparent; 
-            border-radius: 12px;
-            transition: 0.3s;
-        }
-
-        .tab-btn.active { 
-            background: var(--card); 
-            color: var(--primary); 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-main); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 500px; background: var(--card); border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid rgba(0,0,0,0.03); }
+        .tabs { display: flex; background: #f1f3f5; padding: 8px; margin: 15px; border-radius: 16px; }
+        .tab-btn { flex: 1; padding: 12px; border: none; cursor: pointer; font-weight: 600; color: var(--text-muted); background: transparent; border-radius: 12px; transition: 0.3s; }
+        .tab-btn.active { background: var(--card); color: var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .content { padding: 0 20px 25px 20px; display: none; }
         .content.active { display: block; }
-
-        #reader { 
-            border-radius: 20px; 
-            overflow: hidden; 
-            background: #000; 
-            margin-bottom: 20px; 
-            border: 4px solid #f1f3f5;
-        }
-
-        #statusJarak { 
-            text-align: center; 
-            font-size: 0.85rem; 
-            margin-bottom: 15px; 
-            font-weight: 600; 
-            padding: 10px; 
-            border-radius: 12px; 
-            transition: 0.3s;
-        }
+        #reader { border-radius: 20px; overflow: hidden; background: #000; margin-bottom: 20px; border: 4px solid #f1f3f5; }
+        #statusJarak { text-align: center; font-size: 0.85rem; margin-bottom: 15px; font-weight: 600; padding: 10px; border-radius: 12px; }
         .di-luar { background: #fff3f3; color: var(--danger); border: 1px solid #ffe3e3; }
         .di-dalam { background: #f0fff4; color: var(--success); border: 1px solid #c6f6d5; }
-
-        #infoScan { 
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 15px;
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 1rem;
-            border: 1px dashed #dee2e6;
-        }
-
+        #infoScan { background: #f8f9fa; padding: 15px; border-radius: 15px; text-align: center; margin-bottom: 20px; border: 1px dashed #dee2e6; }
         .btn-group { display: flex; gap: 12px; margin-bottom: 25px; }
-        .btn-absen { 
-            flex: 1; 
-            padding: 16px; 
-            border-radius: 16px; 
-            border: none; 
-            font-weight: 700; 
-            cursor: pointer; 
-            color: white; 
-            transition: transform 0.2s, box-shadow 0.2s; 
-            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
-        }
-        .btn-absen:active { transform: scale(0.95); }
+        .btn-absen { flex: 1; padding: 16px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; color: white; transition: 0.2s; box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
         .btn-absen.masuk { background: linear-gradient(135deg, #2ecc71, #27ae60); }
         .btn-absen.pulang { background: linear-gradient(135deg, #ef233c, #d90429); }
         .btn-absen.locked { opacity: 0.5; cursor: not-allowed; box-shadow: none; filter: grayscale(0.8); }
-
-        .table-container { overflow-x: auto; margin-top: 15px; }
         table { width: 100%; border-collapse: collapse; }
-        th { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; padding: 12px 8px; border-bottom: 2px solid #f1f3f5; }
+        th { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; padding: 12px 8px; border-bottom: 2px solid #f1f3f5; text-align: left; }
         td { padding: 14px 8px; font-size: 0.9rem; border-bottom: 1px solid #f1f3f5; }
-        
-        .badge { 
-            padding: 5px 10px; 
-            border-radius: 8px; 
-            font-size: 0.7rem; 
-            font-weight: 700;
-            color: white;
-        }
-
-        input { 
-            width: 100%; 
-            padding: 14px; 
-            margin-bottom: 15px; 
-            border-radius: 12px; 
-            border: 1px solid #dee2e6; 
-            background: #f8f9fa;
-            box-sizing: border-box; 
-            font-size: 1rem;
-        }
-
-        .btn-primary { 
-            background: var(--primary); 
-            color: white; 
-            width: 100%; 
-            padding: 15px; 
-            border: none; 
-            border-radius: 14px; 
-            font-weight: 700; 
-            cursor: pointer; 
-            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.2);
-        }
-
-        .btn-action { 
-            padding: 8px 12px; 
-            border-radius: 8px; 
-            border: none; 
-            color: white; 
-            font-weight: 600; 
-            font-size: 0.7rem; 
-            cursor: pointer; 
-            margin-right: 4px; 
-        }
-
-        .btn-excel { 
-            background: #fff; 
-            color: var(--success); 
-            padding: 8px 12px; 
-            border-radius: 10px; 
-            font-size: 0.75rem; 
-            border: 1px solid var(--success); 
-            cursor: pointer; 
-            font-weight: 600;
-        }
+        .badge { padding: 5px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; color: white; }
+        input { width: 100%; padding: 14px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #dee2e6; background: #f8f9fa; box-sizing: border-box; }
+        .btn-primary { background: var(--primary); color: white; width: 100%; padding: 15px; border: none; border-radius: 14px; font-weight: 700; cursor: pointer; }
+        .btn-action { padding: 8px 12px; border-radius: 8px; border: none; color: white; font-weight: 600; font-size: 0.7rem; cursor: pointer; margin-right: 4px; }
     </style>
 </head>
 <body>
@@ -188,48 +51,32 @@
     <div id="tab-absen" class="content active">
         <div id="reader"></div>
         <div id="statusJarak">Mendeteksi Lokasi...</div>
-        
-        <div id="infoScan">
-            <span style="color: var(--text-muted);">Silakan Scan QR Terlebih Dahulu</span>
-        </div>
-
+        <div id="infoScan">Silakan Scan QR Pegawai</div>
         <div class="btn-group">
             <button id="btnIn" class="btn-absen masuk" onclick="prosesAbsen('Masuk')">MASUK</button>
-            <button id="btnOut" class="btn-absen pulang" onclick="prosesAbsen('PULANG')">PULANG</button>
+            <button id="btnOut" class="btn-absen pulang" onclick="prosesAbsen('Pulang')">PULANG</button>
         </div>
-        
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-            <h4 style="margin:0; font-size: 1rem;">Log Hari Ini</h4>
-            <button class="btn-excel" onclick="exportExcelAbsensi()">📊 Laporan</button>
+            <h4 style="margin:0">Log Hari Ini</h4>
+            <button style="background:white; color:var(--success); border:1px solid var(--success); padding:5px 10px; border-radius:8px; cursor:pointer; font-weight:600;" onclick="exportExcelAbsensi()">📊 Laporan</button>
         </div>
-        
-        <div class="table-container">
-            <table>
-                <thead><tr><th>Nama</th><th>Jam</th><th>Status</th></tr></thead>
-                <tbody id="logAbsen"></tbody>
-            </table>
-        </div>
+        <table>
+            <thead><tr><th>Nama</th><th>Jam</th><th>Ket</th></tr></thead>
+            <tbody id="logAbsen"></tbody>
+        </table>
     </div>
 
     <div id="tab-admin" class="content">
-        <h3 style="margin-top:0">Tambah Pegawai</h3>
+        <h3>Tambah Pegawai</h3>
         <input type="text" id="regNama" placeholder="Nama Lengkap Pegawai...">
         <button class="btn-primary" onclick="simpanPegawai()">+ Daftarkan Pegawai</button>
-
-        <div id="qrcode-container" style="display:none; text-align:center; margin-top:20px; padding:20px; background: #f8f9fa; border-radius:15px; border:2px dashed #dee2e6;">
+        <div id="qrcode-container" style="display:none; text-align:center; margin-top:20px; padding:20px; background:#f8f9fa; border-radius:15px; border:2px dashed #dee2e6;">
             <div id="qrcode" style="display:flex; justify-content:center;"></div>
             <p id="qrLabel" style="font-weight:bold; margin:15px 0; color:var(--primary);"></p>
-            <button class="btn-action" style="background:var(--primary); padding:10px 20px" onclick="window.print()">Cetak QR</button>
+            <button class="btn-primary" style="width:auto; padding:8px 20px" onclick="window.print()">Cetak QR</button>
         </div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px; margin-bottom:10px;">
-            <h4 style="margin:0">Database</h4>
-            <button class="btn-excel" style="color: #4361ee; border-color: #4361ee" onclick="exportExcelPegawai()">💾 Export</button>
-        </div>
-        <table>
-            <thead><tr><th>Nama Pegawai</th><th>Aksi</th></tr></thead>
-            <tbody id="listPegawai"></tbody>
-        </table>
+        <h4 style="margin-top:30px">Daftar Pegawai</h4>
+        <table id="listPegawai"></table>
     </div>
 </div>
 
@@ -247,7 +94,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     
-    // --- UPDATE KOORDINAT KANTOR ANDA ---
     const LAT_KANTOR = -7.716846501344563; 
     const LON_KANTOR = 112.06776955014226; 
     const MAX_JARAK = 100; 
@@ -267,9 +113,7 @@
         const R = 6371e3;
         const dLat = (lat2-lat1) * Math.PI/180;
         const dLon = (lon2-lon1) * Math.PI/180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
         return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
     }
 
@@ -304,11 +148,7 @@
         arr.reverse().forEach(i => {
             let warna = i.status === "Terlambat" ? "var(--danger)" : "var(--success)";
             if(i.tipe === "Pulang") warna = "var(--primary)";
-            html += `<tr>
-                <td><strong>${i.nama}</strong><br><small style="color:gray">${i.tipe}</small></td>
-                <td>${i.waktu}</td>
-                <td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td>
-            </tr>`;
+            html += `<tr><td><b>${i.nama}</b><br><small>${i.tipe}</small></td><td>${i.waktu}</td><td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td></tr>`;
         });
         document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='3' style='text-align:center'>Belum ada aktivitas</td></tr>";
     });
@@ -326,67 +166,68 @@
                 }
             });
             window.cekAbsen = { masuk: sdhM, pulang: sdhP };
+            updateButtonVisual();
             document.getElementById('infoScan').innerHTML = `Pegawai: <b style="color:var(--primary)">${nama}</b>`;
-            
-            const btnIn = document.getElementById('btnIn');
-            const btnOut = document.getElementById('btnOut');
-            if(sdhM) btnIn.classList.add('locked'); else btnIn.classList.remove('locked');
-            if(!sdhM || sdhP) btnOut.classList.add('locked'); else btnOut.classList.remove('locked');
         });
+    }
+
+    function updateButtonVisual() {
+        const btnIn = document.getElementById('btnIn');
+        const btnOut = document.getElementById('btnOut');
+        
+        // Kunci Masuk jika sudah masuk
+        if(window.cekAbsen.masuk) btnIn.classList.add('locked'); else btnIn.classList.remove('locked');
+        
+        // Kunci Pulang jika belum masuk ATAU sudah pulang
+        if(!window.cekAbsen.masuk || window.cekAbsen.pulang) btnOut.classList.add('locked'); else btnOut.classList.remove('locked');
     }
 
     function prosesAbsen(tipe) {
         if (!namaTerdeteksi) { alert("Scan QR Terlebih Dahulu!"); return; }
         
-        // 1. Validasi Radius
         if (jarakSekarang > MAX_JARAK) {
             bicara(`Maaf ${namaTerdeteksi}, Anda berada di luar jangkauan, mohon mendekat ke kantor.`);
             return;
         }
 
-        // 2. Validasi Absen Masuk Ganda
+        // VALIDASI KETAT
         if (tipe === "Masuk" && window.cekAbsen.masuk) {
-            if (window.cekAbsen.pulang) {
-                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk dan pulang hari ini.`);
-            } else {
-                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk.`);
-            }
-            return; // Berhenti di sini, tidak simpan ke database
+            bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk.`);
+            return;
         }
 
-        // 3. Validasi Absen Pulang (Penyebab Error Sebelumnya)
         if (tipe === "Pulang") {
             if (!window.cekAbsen.masuk) {
                 bicara(`Maaf ${namaTerdeteksi}, Anda belum absen masuk hari ini.`);
-                return; // Berhenti
+                return;
             }
             if (window.cekAbsen.pulang) {
-                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang. Sampai jumpa besok.`);
-                return; // SEKARANG SUDAH DIKUNCI: Tidak akan simpan data ganda
+                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang hari ini.`);
+                return;
             }
         }
 
-        // 4. Jika lolos semua validasi di atas, baru simpan ke Firebase
         const skrg = new Date();
         const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
         let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
 
         db.ref('log_absen').push({
-            nama: namaTerdeteksi, 
-            tipe: tipe, 
-            waktu: jamStr, 
-            status: status, 
-            ts: Date.now()
+            nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, status: status, ts: Date.now()
         }).then(() => {
             bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
+            // Update status lokal secara instan agar tombol langsung terkunci
+            if(tipe === "Masuk") window.cekAbsen.masuk = true;
+            if(tipe === "Pulang") window.cekAbsen.pulang = true;
+            updateButtonVisual();
+            
             alert(`Absen ${tipe} Berhasil!`);
-            checkStatusAbsen(namaTerdeteksi);
         });
     }
 
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render((txt) => { checkStatusAbsen(txt); });
 
+    // Fungsi Admin Tetap Sama
     db.ref('pegawai').on('value', (snap) => {
         let html = "";
         snap.forEach(c => {
@@ -426,16 +267,6 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Riwayat");
             XLSX.writeFile(wb, "Laporan_Absen.xlsx");
-        });
-    }
-    function exportExcelPegawai() {
-        db.ref('pegawai').once('value', (snap) => {
-            let data = [];
-            snap.forEach(c => { if (c.val().nama) data.push({ "Nama": c.val().nama }); });
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Database");
-            XLSX.writeFile(wb, "Data_Pegawai.xlsx");
         });
     }
 </script>
