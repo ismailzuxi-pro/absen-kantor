@@ -75,9 +75,11 @@
             <p id="qrLabel" style="font-weight:bold; margin:15px 0; color:var(--primary);"></p>
             <button class="btn-primary" style="width:auto; padding:8px 20px" onclick="window.print()">Cetak QR</button>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px; margin-bottom: 10px;">
             <h4 style="margin:0">Daftar Pegawai</h4>
-            <button class="btn-primary" style="width:auto; padding:8px 15px; font-size:0.8rem; background:#2ecc71;" onclick="exportExcelPegawai()">📥 Export Pegawai</button>
+            <button style="background:white; color:#2ecc71; border:1px solid #2ecc71; padding:5px 10px; border-radius:8px; cursor:pointer; font-weight:600; display: flex; align-items: center; gap: 5px;" onclick="exportExcelPegawai()">
+                📊 Export Pegawai
+            </button>
         </div>
         <!-- <h4 style="margin-top:30px">Daftar Pegawai</h4> -->
         <table id="listPegawai"></table>
@@ -348,22 +350,30 @@
             XLSX.writeFile(wb, "Laporan_Absen.xlsx");
         });
     }
-    function exportExcelPegawai() {
+// Fungsi Modul Export Daftar Pegawai
+function exportExcelPegawai() {
     db.ref('pegawai').once('value', (snap) => {
         let data = [];
         let no = 1;
         snap.forEach(c => {
             const p = c.val();
-            data.push({
-                "No": no++,
-                "Nama Pegawai": p.nama,
-                "ID Database": c.key
+            data.push({ 
+                "No": no++, 
+                "Nama Pegawai": p.nama, 
+                "ID Database": c.key 
             });
         });
-        if(data.length === 0) { alert("Data pegawai masih kosong!"); return; }
+
+        if(data.length === 0) {
+            alert("Data pegawai masih kosong!");
+            return;
+        }
+
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
+        
+        // Simpan file dengan nama Daftar_Pegawai.xlsx
         XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
     });
 }
