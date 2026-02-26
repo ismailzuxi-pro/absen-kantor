@@ -237,7 +237,7 @@
         }
 
         if (tipe === "Pulang" && (window.cekAbsen.pulang || !window.cekAbsen.masuk)) {
-            bicara(`Maaf ${namaTerdeteksi}, status absen tidak valid.`);
+            bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang.`);
             logoutTimer = setTimeout(resetSesi, 3000);
             return;
         }
