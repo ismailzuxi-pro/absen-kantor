@@ -308,19 +308,41 @@
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render((txt) => { checkStatusAbsen(txt); });
 
-    // Fungsi Admin Tetap Sama
-    db.ref('pegawai').on('value', (snap) => {
-        let html = "";
-        snap.forEach(c => {
-            const d = c.val();
-            html += `<tr><td><b>${d.nama}</b></td><td>
+    // Fungsi Render Daftar Pegawai dengan No Urut & Urutan Terlama -> Terbaru
+db.ref('pegawai').on('value', (snap) => {
+    let html = "";
+    let no = 1; // Inisialisasi nomor urut
+
+    // Render langsung dari Firebase (Firebase secara default memberikan urutan berdasarkan waktu input/terlama ke terbaru)
+    snap.forEach(c => {
+        const d = c.val();
+        html += `<tr>
+            <td style="padding: 10px;">${no++}.</td> 
+            <td><b>${d.nama}</b></td>
+            <td style="text-align: right;">
                 <button class="btn-action" style="background:#f1c40f" onclick="editPegawai('${c.key}', '${d.nama}')">Edit</button>
                 <button class="btn-action" style="background:#e74c3c" onclick="hapusPegawai('${c.key}')">Hapus</button>
                 <button class="btn-action" style="background:#2ecc71" onclick="tampilQR('${d.nama}')">QR</button>
-            </td></tr>`;
-        });
-        document.getElementById('listPegawai').innerHTML = html;
+            </td>
+        </tr>`;
     });
+    
+    document.getElementById('listPegawai').innerHTML = html || "<tr><td colspan='3' style='text-align:center'>Belum ada pegawai terdaftar</td></tr>";
+});
+
+    // Fungsi Admin Tetap Sama
+    // db.ref('pegawai').on('value', (snap) => {
+    //     let html = "";
+    //     snap.forEach(c => {
+    //         const d = c.val();
+    //         html += `<tr><td><b>${d.nama}</b></td><td>
+    //             <button class="btn-action" style="background:#f1c40f" onclick="editPegawai('${c.key}', '${d.nama}')">Edit</button>
+    //             <button class="btn-action" style="background:#e74c3c" onclick="hapusPegawai('${c.key}')">Hapus</button>
+    //             <button class="btn-action" style="background:#2ecc71" onclick="tampilQR('${d.nama}')">QR</button>
+    //         </td></tr>`;
+    //     });
+    //     document.getElementById('listPegawai').innerHTML = html;
+    // });
 
     function simpanPegawai() {
         const n = document.getElementById('regNama').value.trim();
