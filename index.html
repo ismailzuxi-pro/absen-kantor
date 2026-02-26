@@ -153,7 +153,22 @@
         document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='3' style='text-align:center'>Belum ada aktivitas</td></tr>";
     });
 
+    // Tambahkan variabel timer di bagian atas
+    let logoutTimer;
+
+    function resetSesi() {
+        // Fungsi untuk membersihkan identitas pegawai dari layar
+        namaTerdeteksi = "";
+        window.cekAbsen = { masuk: false, pulang: false };
+        document.getElementById('infoScan').innerHTML = `<span style="color: var(--text-muted);">Silakan Scan QR Terlebih Dahulu</span>`;
+        updateButtonVisual();
+        console.log("Sesi telah direset otomatis.");
+    }
+
     function checkStatusAbsen(nama) {
+        // Setiap kali ada scan baru, batalkan timer reset yang lama
+        clearTimeout(logoutTimer);
+        
         namaTerdeteksi = nama;
         const tglHariIni = new Date().toLocaleDateString('id-ID');
         db.ref('log_absen').once('value', (snap) => {
@@ -168,8 +183,29 @@
             window.cekAbsen = { masuk: sdhM, pulang: sdhP };
             updateButtonVisual();
             document.getElementById('infoScan').innerHTML = `Pegawai: <b style="color:var(--primary)">${nama}</b>`;
+            
+            // Mulai hitung mundur 15 detik. Jika tidak ada aktivitas, data hilang.
+            logoutTimer = setTimeout(resetSesi, 15000); 
         });
     }
+
+    // function checkStatusAbsen(nama) {
+    //     namaTerdeteksi = nama;
+    //     const tglHariIni = new Date().toLocaleDateString('id-ID');
+    //     db.ref('log_absen').once('value', (snap) => {
+    //         let sdhM = false; let sdhP = false;
+    //         snap.forEach(c => {
+    //             const log = c.val();
+    //             if(log.nama === nama && new Date(log.ts).toLocaleDateString('id-ID') === tglHariIni) {
+    //                 if(log.tipe === "Masuk") sdhM = true;
+    //                 if(log.tipe === "Pulang") sdhP = true;
+    //             }
+    //         });
+    //         window.cekAbsen = { masuk: sdhM, pulang: sdhP };
+    //         updateButtonVisual();
+    //         document.getElementById('infoScan').innerHTML = `Pegawai: <b style="color:var(--primary)">${nama}</b>`;
+    //     });
+    // }
 
     function updateButtonVisual() {
         const btnIn = document.getElementById('btnIn');
@@ -185,26 +221,25 @@
     function prosesAbsen(tipe) {
         if (!namaTerdeteksi) { alert("Scan QR Terlebih Dahulu!"); return; }
         
+        // Batalkan timer reset karena ada aktivitas klik tombol
+        clearTimeout(logoutTimer);
+
         if (jarakSekarang > MAX_JARAK) {
-            bicara(`Maaf ${namaTerdeteksi}, Anda berada di luar jangkauan, mohon mendekat ke kantor.`);
+            bicara(`Maaf ${namaTerdeteksi}, Anda berada di luar jangkauan.`);
+            logoutTimer = setTimeout(resetSesi, 3000); // Reset cepat jika gagal
             return;
         }
 
-        // VALIDASI KETAT
         if (tipe === "Masuk" && window.cekAbsen.masuk) {
             bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk.`);
+            logoutTimer = setTimeout(resetSesi, 3000);
             return;
         }
 
-        if (tipe === "Pulang") {
-            if (!window.cekAbsen.masuk) {
-                bicara(`Maaf ${namaTerdeteksi}, Anda belum absen masuk hari ini.`);
-                return;
-            }
-            if (window.cekAbsen.pulang) {
-                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang hari ini.`);
-                return;
-            }
+        if (tipe === "Pulang" && (window.cekAbsen.pulang || !window.cekAbsen.masuk)) {
+            bicara(`Maaf ${namaTerdeteksi}, status absen tidak valid.`);
+            logoutTimer = setTimeout(resetSesi, 3000);
+            return;
         }
 
         const skrg = new Date();
@@ -215,14 +250,54 @@
             nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, status: status, ts: Date.now()
         }).then(() => {
             bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
-            // Update status lokal secara instan agar tombol langsung terkunci
-            if(tipe === "Masuk") window.cekAbsen.masuk = true;
-            if(tipe === "Pulang") window.cekAbsen.pulang = true;
-            updateButtonVisual();
-            
             alert(`Absen ${tipe} Berhasil!`);
+            
+            // SETELAH BERHASIL ABSEN: Langsung reset data dalam 2 detik
+            setTimeout(resetSesi, 2000); 
         });
     }
+
+    // function prosesAbsen(tipe) {
+    //     if (!namaTerdeteksi) { alert("Scan QR Terlebih Dahulu!"); return; }
+        
+    //     if (jarakSekarang > MAX_JARAK) {
+    //         bicara(`Maaf ${namaTerdeteksi}, Anda berada di luar jangkauan, mohon mendekat ke kantor.`);
+    //         return;
+    //     }
+
+    //     // VALIDASI KETAT
+    //     if (tipe === "Masuk" && window.cekAbsen.masuk) {
+    //         bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk.`);
+    //         return;
+    //     }
+
+    //     if (tipe === "Pulang") {
+    //         if (!window.cekAbsen.masuk) {
+    //             bicara(`Maaf ${namaTerdeteksi}, Anda belum absen masuk hari ini.`);
+    //             return;
+    //         }
+    //         if (window.cekAbsen.pulang) {
+    //             bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang hari ini.`);
+    //             return;
+    //         }
+    //     }
+
+    //     const skrg = new Date();
+    //     const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+    //     let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
+
+    //     db.ref('log_absen').push({
+    //         nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, status: status, ts: Date.now()
+    //     }).then(() => {
+    //         bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
+    //         // Update status lokal secara instan agar tombol langsung terkunci
+    //         if(tipe === "Masuk") window.cekAbsen.masuk = true;
+    //         if(tipe === "Pulang") window.cekAbsen.pulang = true;
+    //         updateButtonVisual();
+            
+    //         alert(`Absen ${tipe} Berhasil!`);
+    //     });
+    // }
 
     let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render((txt) => { checkStatusAbsen(txt); });
