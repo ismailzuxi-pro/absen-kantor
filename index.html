@@ -337,29 +337,46 @@
 
     function prosesAbsen(tipe) {
         if (!namaTerdeteksi) { alert("Scan QR Terlebih Dahulu!"); return; }
+        
+        // 1. Validasi Radius
         if (jarakSekarang > MAX_JARAK) {
             bicara(`Maaf ${namaTerdeteksi}, Anda berada di luar jangkauan, mohon mendekat ke kantor.`);
             return;
         }
 
+        // 2. Validasi Absen Masuk Ganda
         if (tipe === "Masuk" && window.cekAbsen.masuk) {
-            if (window.cekAbsen.pulang) bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk dan pulang hari ini.`);
-            else bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk.`);
-            return;
+            if (window.cekAbsen.pulang) {
+                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk dan pulang hari ini.`);
+            } else {
+                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen masuk.`);
+            }
+            return; // Berhenti di sini, tidak simpan ke database
         }
 
-        if (tipe === "Pulang" && (!window.cekAbsen.masuk || window.cekAbsen.pulang)) {
-            if(!window.cekAbsen.masuk) bicara(`Maaf ${namaTerdeteksi}, Anda belum absen masuk.`);
-            else bicara(`Maaf ${namaTerdeteksi}, Anda sudah selesai bertugas hari ini.`);
-            return;
+        // 3. Validasi Absen Pulang (Penyebab Error Sebelumnya)
+        if (tipe === "Pulang") {
+            if (!window.cekAbsen.masuk) {
+                bicara(`Maaf ${namaTerdeteksi}, Anda belum absen masuk hari ini.`);
+                return; // Berhenti
+            }
+            if (window.cekAbsen.pulang) {
+                bicara(`Maaf ${namaTerdeteksi}, Anda sudah absen pulang. Sampai jumpa besok.`);
+                return; // SEKARANG SUDAH DIKUNCI: Tidak akan simpan data ganda
+            }
         }
 
+        // 4. Jika lolos semua validasi di atas, baru simpan ke Firebase
         const skrg = new Date();
         const jamStr = skrg.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
         let status = tipe === "Masuk" ? (jamStr > "08:00" ? "Terlambat" : "Tepat Waktu") : "Selesai";
 
         db.ref('log_absen').push({
-            nama: namaTerdeteksi, tipe: tipe, waktu: jamStr, status: status, ts: Date.now()
+            nama: namaTerdeteksi, 
+            tipe: tipe, 
+            waktu: jamStr, 
+            status: status, 
+            ts: Date.now()
         }).then(() => {
             bicara(`Berhasil absen ${tipe}, ${namaTerdeteksi}.`);
             alert(`Absen ${tipe} Berhasil!`);
