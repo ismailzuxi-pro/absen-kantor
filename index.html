@@ -61,7 +61,14 @@
             <button style="background:white; color:var(--success); border:1px solid var(--success); padding:5px 10px; border-radius:8px; cursor:pointer; font-weight:600;" onclick="exportExcelAbsensi()">📊 Laporan</button>
         </div>
         <table>
-            <thead><tr><th>Nama</th><th>Jam</th><th>Ket</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>NAMA</th>
+                    <th>DIVISI</th>
+                    <th>JAM</th>
+                    <th>KET</th>
+                </tr>
+            </thead>
             <tbody id="logAbsen"></tbody>
         </table>
     </div>
@@ -163,24 +170,48 @@
             if(new Date(d.ts).toLocaleDateString('id-ID') === tglHariIni) arr.push(d);
         });
 
-        // 3. Render tabel
+                // Ganti baris 173 - 189 di image_367057.png dengan ini:
         arr.reverse().forEach(i => {
             let warna = i.status === "Terlambat" ? "var(--danger)" : "var(--success)";
             if(i.tipe === "Pulang") warna = "var(--primary)";
             
-            // Ambil divisi berdasarkan nama, jika tidak ada tampilkan strip
-            const div = daftarDivisi[i.nama] ? ` (${daftarDivisi[i.nama]})` : "";
+            // Ambil divisi saja tanpa kurung
+            const div = daftarDivisi[i.nama] || "-";
 
             html += `<tr>
                 <td>
-                    <b>${i.nama}${div}</b><br>
+                    <b>${i.nama}</b><br>
                     <small style="color:gray;">${i.tipe}</small>
                 </td>
-                <td>${i.waktu}</td>
-                <td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td>
+                <td style="vertical-align: middle;">${div}</td>
+                <td style="vertical-align: middle;">${i.waktu}</td>
+                <td style="vertical-align: middle;">
+                    <span class="badge" style="background:${warna}">${i.status || '-'}</span>
+                </td>
             </tr>`;
         });
-        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='3' style='text-align:center'>Belum ada aktivitas</td></tr>";
+
+        // Update colspan menjadi 4 karena sekarang ada 4 kolom
+        document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='4' style='text-align:center'>Belum ada aktivitas</td></tr>";
+
+        // // 3. Render tabel
+        // arr.reverse().forEach(i => {
+        //     let warna = i.status === "Terlambat" ? "var(--danger)" : "var(--success)";
+        //     if(i.tipe === "Pulang") warna = "var(--primary)";
+            
+        //     // Ambil divisi berdasarkan nama, jika tidak ada tampilkan strip
+        //     const div = daftarDivisi[i.nama] ? ` (${daftarDivisi[i.nama]})` : "";
+
+        //     html += `<tr>
+        //         <td>
+        //             <b>${i.nama}${div}</b><br>
+        //             <small style="color:gray;">${i.tipe}</small>
+        //         </td>
+        //         <td>${i.waktu}</td>
+        //         <td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td>
+        //     </tr>`;
+        // });
+        // document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='3' style='text-align:center'>Belum ada aktivitas</td></tr>";
     });
 });
 
