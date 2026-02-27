@@ -447,11 +447,15 @@ db.ref('pegawai').on('value', (snap) => {
     if (b_nama !== null) {
         const b_divisi = prompt("Ubah Divisi:", d_lama);
         if (b_divisi !== null) {
-            db.ref('pegawai/' + k).update({ 
-                nama: b_nama.trim(), 
-                divisi: b_divisi.trim() 
+            // Pastikan menggunakan .update dan kurung kurawal yang benar
+            db.ref('pegawai/' + k).update({
+                nama: b_nama.trim(),
+                divisi: b_divisi.trim()
             }).then(() => {
                 alert("Data berhasil diperbarui");
+            }).catch((error) => {
+                console.error("Error update:", error);
+                alert("Gagal memperbarui data!");
             });
         }
     }
