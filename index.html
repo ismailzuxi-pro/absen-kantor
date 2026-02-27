@@ -146,19 +146,58 @@
     }
 
     db.ref('log_absen').on('value', (snap) => {
-        let html = ""; let arr = [];
-        const tglHariIni = new Date().toLocaleDateString('id-ID');
+    let html = "";
+    let arr = [];
+    const tglHariIni = new Date().toLocaleDateString('id-ID');
+
+    // 1. Ambil data semua pegawai dulu untuk mencari divisinya
+    db.ref('pegawai').once('value', (pegawaiSnap) => {
+        const daftarDivisi = {};
+        pegawaiSnap.forEach(p => {
+            daftarDivisi[p.val().nama] = p.val().divisi; 
+        });
+
+        // 2. Filter log absen untuk hari ini
         snap.forEach(c => {
             const d = c.val();
             if(new Date(d.ts).toLocaleDateString('id-ID') === tglHariIni) arr.push(d);
         });
+
+        // 3. Render tabel
         arr.reverse().forEach(i => {
             let warna = i.status === "Terlambat" ? "var(--danger)" : "var(--success)";
             if(i.tipe === "Pulang") warna = "var(--primary)";
-            html += `<tr><td><b>${i.nama}</b><br><small>${i.tipe}</small></td><td>${i.waktu}</td><td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td></tr>`;
+            
+            // Ambil divisi berdasarkan nama, jika tidak ada tampilkan strip
+            const div = daftarDivisi[i.nama] ? ` (${daftarDivisi[i.nama]})` : "";
+
+            html += `<tr>
+                <td>
+                    <b>${i.nama}${div}</b><br>
+                    <small style="color:gray;">${i.tipe}</small>
+                </td>
+                <td>${i.waktu}</td>
+                <td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td>
+            </tr>`;
         });
         document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='3' style='text-align:center'>Belum ada aktivitas</td></tr>";
     });
+});
+
+    // db.ref('log_absen').on('value', (snap) => {
+    //     let html = ""; let arr = [];
+    //     const tglHariIni = new Date().toLocaleDateString('id-ID');
+    //     snap.forEach(c => {
+    //         const d = c.val();
+    //         if(new Date(d.ts).toLocaleDateString('id-ID') === tglHariIni) arr.push(d);
+    //     });
+    //     arr.reverse().forEach(i => {
+    //         let warna = i.status === "Terlambat" ? "var(--danger)" : "var(--success)";
+    //         if(i.tipe === "Pulang") warna = "var(--primary)";
+    //         html += `<tr><td><b>${i.nama}</b><br><small>${i.tipe}</small></td><td>${i.waktu}</td><td><span class="badge" style="background:${warna}">${i.status || '-'}</span></td></tr>`;
+    //     });
+    //     document.getElementById('logAbsen').innerHTML = html || "<tr><td colspan='3' style='text-align:center'>Belum ada aktivitas</td></tr>";
+    // });
 
     // Tambahkan variabel timer di bagian atas
     let logoutTimer;
