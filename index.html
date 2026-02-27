@@ -450,18 +450,58 @@ db.ref('pegawai').on('value', (snap) => {
         new QRCode(document.getElementById('qrcode'), { text: n, width: 150, height: 150 });
         document.getElementById('qrLabel').innerText = n;
     }
+    // function exportExcelAbsensi() {
+    //     db.ref('log_absen').once('value', (snap) => {
+    //         let data = [];
+    //         snap.forEach(c => {
+    //             const i = c.val();
+    //             data.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Keterangan: i.status });
+    //         });
+    //         const ws = XLSX.utils.json_to_sheet(data);
+    //         const wb = XLSX.utils.book_new();
+    //         XLSX.utils.book_append_sheet(wb, ws, "Riwayat");
+    //         XLSX.writeFile(wb, "Laporan_Absen.xlsx");
+    //     });
+    // }
+
     function exportExcelAbsensi() {
-        db.ref('log_absen').once('value', (snap) => {
-            let data = [];
-            snap.forEach(c => {
-                const i = c.val();
-                data.push({ Tanggal: new Date(i.ts).toLocaleDateString('id-ID'), Nama: i.nama, Tipe: i.tipe, Jam: i.waktu, Keterangan: i.status });
+    db.ref('log_absen').once('value', (snap) => {
+        let data = [];
+        const tglHariIni = new Date().toLocaleDateString('id-ID');
+
+        // 1. Ambil data pegawai untuk referensi divisi
+        db.ref('pegawai').once('value', (pegawaiSnap) => {
+            const daftarDivisi = {};
+            pegawaiSnap.forEach(p => {
+                daftarDivisi[p.val().nama] = p.val().divisi;
             });
+
+            // 2. Filter log untuk hari ini saja
+            snap.forEach(c => {
+                const d = c.val();
+                if (new Date(d.ts).toLocaleDateString('id-ID') === tglHariIni) {
+                    data.push({
+                        "Waktu": d.waktu,
+                        "Nama": d.nama,
+                        "Divisi": daftarDivisi[d.nama] || "-", // Menambahkan kolom Divisi
+                        "Tipe": d.tipe,
+                        "Status": d.status || "-"
+                    });
+                }
+            });
+
+            if (data.length === 0) {
+                alert("Tidak ada data absen hari ini untuk diekspor!");
+                return;
+            }
+
+            // 3. Proses menjadi file Excel
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Riwayat");
-            XLSX.writeFile(wb, "Laporan_Absen.xlsx");
+            XLSX.utils.book_append_sheet(wb, ws, "Laporan Absensi");
+            XLSX.writeFile(wb, `Laporan_Absen_${tglHariIni.replace(/\//g, '-')}.xlsx`);
         });
+    });
     }
 
     function exportExcelPegawai() {
