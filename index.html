@@ -67,8 +67,9 @@
     </div>
 
     <div id="tab-admin" class="content">
-        <h3>Tambah Pegawai</h3>
+        <h3 style="margin-top:0">Tambah Pegawai</h3>
         <input type="text" id="regNama" placeholder="Nama Lengkap Pegawai...">
+        <input type="text" id="regDivisi" placeholder="Divisi (Contoh: IT, Marketing, HR)..." style="margin-bottom:10px;">
         <button class="btn-primary" onclick="simpanPegawai()">+ Daftarkan Pegawai</button>
         <div id="qrcode-container" style="display:none; text-align:center; margin-top:20px; padding:20px; background:#f8f9fa; border-radius:15px; border:2px dashed #dee2e6;">
             <div id="qrcode" style="display:flex; justify-content:center;"></div>
@@ -318,7 +319,10 @@ db.ref('pegawai').on('value', (snap) => {
         const d = c.val();
         html += `<tr>
             <td style="padding: 10px;">${no++}.</td> 
-            <td><b>${d.nama}</b></td>
+            <td>
+                <b>${d.nama}</b><br>
+                <small style="color:gray;">Divisi: ${d.divisi || '-'}</small>
+            </td>
             <td style="text-align: right;">
                 <button class="btn-action" style="background:#f1c40f" onclick="editPegawai('${c.key}', '${d.nama}')">Edit</button>
                 <button class="btn-action" style="background:#e74c3c" onclick="hapusPegawai('${c.key}')">Hapus</button>
@@ -344,12 +348,29 @@ db.ref('pegawai').on('value', (snap) => {
     //     document.getElementById('listPegawai').innerHTML = html;
     // });
 
+    // function simpanPegawai() {
+    //     const n = document.getElementById('regNama').value.trim();
+    //     if(n) db.ref('pegawai').push({ nama: n }).then(() => {
+    //         document.getElementById('regNama').value = "";
+    //         tampilQR(n);
+    //     });
+    // }
     function simpanPegawai() {
-        const n = document.getElementById('regNama').value.trim();
-        if(n) db.ref('pegawai').push({ nama: n }).then(() => {
+    const n = document.getElementById('regNama').value.trim();
+    const d = document.getElementById('regDivisi').value.trim(); // Ambil nilai divisi
+    
+    if(n && d) { // Pastikan keduanya diisi
+        db.ref('pegawai').push({ 
+            nama: n, 
+            divisi: d // Simpan divisi ke database
+        }).then(() => {
             document.getElementById('regNama').value = "";
+            document.getElementById('regDivisi').value = ""; // Kosongkan input
             tampilQR(n);
         });
+    } else {
+        alert("Mohon isi Nama dan Divisi!");
+        }
     }
     function editPegawai(k, n) { const b = prompt("Ubah Nama:", n); if(b) db.ref('pegawai/' + k).update({ nama: b }); }
     function hapusPegawai(k) { if(confirm("Hapus?")) db.ref('pegawai/' + k).remove(); }
@@ -372,20 +393,21 @@ db.ref('pegawai').on('value', (snap) => {
             XLSX.writeFile(wb, "Laporan_Absen.xlsx");
         });
     }
-// Fungsi Modul Export Daftar Pegawai
-function exportExcelPegawai() {
+
+    function exportExcelPegawai() {
     db.ref('pegawai').once('value', (snap) => {
         let data = [];
         let no = 1;
         snap.forEach(c => {
             const p = c.val();
-            data.push({ 
-                "No": no++, 
-                "Nama Pegawai": p.nama, 
-                "ID Database": c.key 
+            data.push({
+                "No": no++,
+                "Nama Pegawai": p.nama,
+                "Divisi": p.divisi || "-", // TAMBAHKAN BARIS INI
+                "ID Database": c.key
             });
         });
-
+        
         if(data.length === 0) {
             alert("Data pegawai masih kosong!");
             return;
@@ -394,11 +416,37 @@ function exportExcelPegawai() {
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
-        
         // Simpan file dengan nama Daftar_Pegawai.xlsx
         XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
     });
 }
+// Fungsi Modul Export Daftar Pegawai
+// function exportExcelPegawai() {
+//     db.ref('pegawai').once('value', (snap) => {
+//         let data = [];
+//         let no = 1;
+//         snap.forEach(c => {
+//             const p = c.val();
+//             data.push({ 
+//                 "No": no++, 
+//                 "Nama Pegawai": p.nama, 
+//                 "ID Database": c.key 
+//             });
+//         });
+
+//         if(data.length === 0) {
+//             alert("Data pegawai masih kosong!");
+//             return;
+//         }
+
+//         const ws = XLSX.utils.json_to_sheet(data);
+//         const wb = XLSX.utils.book_new();
+//         XLSX.utils.book_append_sheet(wb, ws, "Daftar Pegawai");
+        
+//         // Simpan file dengan nama Daftar_Pegawai.xlsx
+//         XLSX.writeFile(wb, "Daftar_Pegawai.xlsx");
+//     });
+// }
 </script>
 </body>
 </html>
