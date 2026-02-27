@@ -442,22 +442,31 @@ db.ref('pegawai').on('value', (snap) => {
         alert("Mohon isi Nama dan Divisi!");
         }
     }
-    function editPegawai(k, n, d_lama) {
-    const b_nama = prompt("Ubah Nama:", n);
-    if (b_nama !== null) {
-        const b_divisi = prompt("Ubah Divisi:", d_lama);
-        if (b_divisi !== null) {
-            // Pastikan menggunakan .update dan kurung kurawal yang benar
-            db.ref('pegawai/' + k).update({
-                nama: b_nama.trim(),
-                divisi: b_divisi.trim()
-            }).then(() => {
-                alert("Data berhasil diperbarui");
-            }).catch((error) => {
-                console.error("Error update:", error);
-                alert("Gagal memperbarui data!");
-            });
-        }
+    function editPegawai(id, namaLama, divisiLama) {
+    // 1. Tanya Nama
+    let namaBaru = prompt("Ubah Nama:", namaLama);
+    
+    // Jika batal (cancel), berhenti di sini
+    if (namaBaru === null) return; 
+
+    // 2. Tanya Divisi
+    let divisiBaru = prompt("Ubah Divisi:", divisiLama);
+    
+    // Jika batal (cancel), berhenti di sini
+    if (divisiBaru === null) return;
+
+    // 3. Eksekusi Update ke Firebase
+    if (namaBaru.trim() !== "" && divisiBaru.trim() !== "") {
+        db.ref('pegawai/' + id).update({
+            nama: namaBaru.trim(),
+            divisi: divisiBaru.trim()
+        }).then(() => {
+            alert("Data berhasil diperbarui!");
+        }).catch((err) => {
+            alert("Error: " + err.message);
+        });
+    } else {
+        alert("Nama dan Divisi tidak boleh kosong!");
     }
     }
     function hapusPegawai(k) { if(confirm("Hapus?")) db.ref('pegawai/' + k).remove(); }
