@@ -394,7 +394,7 @@ db.ref('pegawai').on('value', (snap) => {
                 <small style="color:gray;">Divisi: ${d.divisi || '-'}</small>
             </td>
             <td style="text-align: right;">
-                <button class="btn-action" style="background:#f1c40f" onclick="editPegawai('${c.key}', '${d.nama}')">Edit</button>
+                <button class="btn-action" style="background:#f1c40f" onclick="editPegawai('${c.key}', '${d.nama}', '${d.divisi || ''}')">Edit</button>
                 <button class="btn-action" style="background:#e74c3c" onclick="hapusPegawai('${c.key}')">Hapus</button>
                 <button class="btn-action" style="background:#2ecc71" onclick="tampilQR('${d.nama}')">QR</button>
             </td>
@@ -442,7 +442,20 @@ db.ref('pegawai').on('value', (snap) => {
         alert("Mohon isi Nama dan Divisi!");
         }
     }
-    function editPegawai(k, n) { const b = prompt("Ubah Nama:", n); if(b) db.ref('pegawai/' + k).update({ nama: b }); }
+    function editPegawai(k, n, d_lama) {
+    const b_nama = prompt("Ubah Nama:", n);
+    if (b_nama !== null) {
+        const b_divisi = prompt("Ubah Divisi:", d_lama);
+        if (b_divisi !== null) {
+            db.ref('pegawai/' + k).update({ 
+                nama: b_nama.trim(), 
+                divisi: b_divisi.trim() 
+            }).then(() => {
+                alert("Data berhasil diperbarui");
+            });
+        }
+    }
+    }
     function hapusPegawai(k) { if(confirm("Hapus?")) db.ref('pegawai/' + k).remove(); }
     function tampilQR(n) {
         document.getElementById('qrcode-container').style.display = "block";
